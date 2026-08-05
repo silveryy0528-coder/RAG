@@ -2,15 +2,8 @@
 
 This module provides small dataclasses for chunking configuration and two
 helper functions that wrap the SentenceSplitter from the llama_index project.
-
-The import of llama_index is optional for tooling/CI that does not install
-that package; a pylint disable is used so linters do not fail in minimal
-environments.
 """
 from dataclasses import dataclass
-# The llama_index package is an optional heavy dependency used at runtime.
-# CI / linters may not have it available; silence static import checks here.
-from llama_index.core.node_parser import SentenceSplitter  # pylint: disable=import-error
 
 
 # %%
@@ -42,6 +35,10 @@ def sentence_splitter(full_text, chunk_size, chunk_overlap):
     not interpret the returned nodes; it simply forwards arguments and returns
     the result so callers can remain library-agnostic.
 
+    The import is performed lazily to avoid requiring the optional
+    llama_index package at module import time (useful for lightweight CI
+    and static analysis runs).
+
     Args:
         full_text: The complete text to split into chunks.
         chunk_size: Approximate maximum size for each chunk.
@@ -50,6 +47,10 @@ def sentence_splitter(full_text, chunk_size, chunk_overlap):
     Returns:
         The result of SentenceSplitter(...).split_text(full_text).
     """
+    # Import lazily to avoid import-time dependency on llama_index.
+    # pylint: disable=import-error
+    from llama_index.core.node_parser import SentenceSplitter
+
     splitter = SentenceSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
     nodes = splitter.split_text(full_text)
     return nodes
