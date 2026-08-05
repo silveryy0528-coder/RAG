@@ -1,55 +1,69 @@
 """Utilities for splitting text into sentence-based chunks.
 
-This module provides small dataclasses for chunking configuration and two
-helper functions that wrap the SentenceSplitter from the llama_index project.
+This module wraps the SentenceSplitter implementation from the
+``llama_index`` project and exposes small configuration dataclasses and
+convenience helpers to split text or collections of documents into chunks.
+
+Note
+----
+This module imports ``SentenceSplitter`` from ``llama_index.core.node_parser``
+and therefore requires that package at runtime. Tests may stub or monkeypatch
+that dependency as needed.
 """
+
+# %%
 from dataclasses import dataclass
+from llama_index.core.node_parser import SentenceSplitter
 
 
 # %%
 @dataclass
 class ChunkingConfig:
-    """Configuration for text chunking behavior.
+    """Configuration for text chunking.
 
-    Attributes:
-        chunk_size: Maximum number of characters (approx) per chunk. Defaults to 500.
+    Parameters
+    ----------
+    chunk_size : int, optional
+        Approximate maximum number of characters per chunk. Default is 500.
     """
+
     chunk_size: int = 500
 
 
 @dataclass
 class ChunkingSentenceConfig(ChunkingConfig):
-    """Chunking configuration specialized for sentence-based splitting.
+    """Chunking settings specialized for sentence-based splitting.
 
-    Attributes:
-        chunk_overlap: Number of characters (approx) to overlap between chunks.
+    Parameters
+    ----------
+    chunk_overlap : int, optional
+        Approximate number of characters to overlap between adjacent chunks.
     """
+
     chunk_overlap: int = 50
 
 
 def sentence_splitter(full_text, chunk_size, chunk_overlap):
-    """Split the provided full_text into sentence-based nodes.
+    """Split full text into sentence-based nodes.
 
-    Wraps the SentenceSplitter from llama_index.core.node_parser and returns
-    whatever structure that class produces. The function purposefully does
-    not interpret the returned nodes; it simply forwards arguments and returns
-    the result so callers can remain library-agnostic.
+    This function constructs a ``SentenceSplitter`` with the provided
+    ``chunk_size`` and ``chunk_overlap`` and returns the nodes produced by
+    its ``split_text`` method.
 
-    The import is performed lazily to avoid requiring the optional
-    llama_index package at module import time (useful for lightweight CI
-    and static analysis runs).
+    Parameters
+    ----------
+    full_text : str
+        The complete text to split into chunks.
+    chunk_size : int
+        Approximate maximum size for each chunk.
+    chunk_overlap : int
+        Approximate overlap between adjacent chunks.
 
-    Args:
-        full_text: The complete text to split into chunks.
-        chunk_size: Approximate maximum size for each chunk.
-        chunk_overlap: Approximate overlap between adjacent chunks.
-
-    Returns:
-        The result of SentenceSplitter(...).split_text(full_text).
+    Returns
+    -------
+    list
+        The nodes produced by :meth:`SentenceSplitter.split_text`.
     """
-    # Import lazily to avoid import-time dependency on llama_index.
-    # pylint: disable=import-error
-    from llama_index.core.node_parser import SentenceSplitter
 
     splitter = SentenceSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
     nodes = splitter.split_text(full_text)
@@ -57,19 +71,25 @@ def sentence_splitter(full_text, chunk_size, chunk_overlap):
 
 
 def chunk_text(documents, settings):
-    """Join document texts and split them into nodes using provided settings.
+    """Join document texts and split them into nodes using ``settings``.
 
-    The function concatenates the .text attribute from each document with a
-    newline separator, then delegates to sentence_splitter using values from
-    the provided settings dataclass.
+    The function concatenates the ``.text`` attribute from each document with
+    a newline separator and delegates to :func:`sentence_splitter` using
+    values from the provided ``settings`` dataclass.
 
-    Args:
-        documents: Iterable of objects that have a .text attribute.
-        settings: ChunkingConfig or ChunkingSentenceConfig instance.
+    Parameters
+    ----------
+    documents : iterable
+        Iterable of objects that expose a ``.text`` attribute.
+    settings : ChunkingConfig or ChunkingSentenceConfig
+        Chunking configuration containing ``chunk_size`` and ``chunk_overlap``.
 
-    Returns:
-        The nodes produced by sentence_splitter.
+    Returns
+    -------
+    list
+        The nodes produced by :func:`sentence_splitter`.
     """
+
     full_text = "\n".join(doc.text for doc in documents)
     nodes = sentence_splitter(full_text, settings.chunk_size, settings.chunk_overlap)
     return nodes
