@@ -38,7 +38,7 @@ jobs:
       run: pytest tests
 
     - name: Format with black
-      run: black rag scripts
+      run: black rag
 
     - name: Check with pylint
       run: pylint rag
