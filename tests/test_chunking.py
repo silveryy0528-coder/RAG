@@ -1,6 +1,38 @@
+import sys
 import types
 from types import SimpleNamespace
 
+# Create a minimal stub package 'llama_index.core.node_parser' so importing
+# rag.chunking does not attempt to import the real llama_index package.
+# This must be done before importing rag.chunking.
+fake_node_parser = types.ModuleType("llama_index.core.node_parser")
+
+class _StubSentenceSplitter:
+    def __init__(self, chunk_size=None, chunk_overlap=None):
+        # store values so tests or the module under test can inspect them
+        self.chunk_size = chunk_size
+        self.chunk_overlap = chunk_overlap
+
+    def split_text(self, text):
+        # Return a simple predictable result; tests will monkeypatch later with a richer FakeSplitter
+        return [{"text": text, "chunk_size": self.chunk_size, "chunk_overlap": self.chunk_overlap}]
+
+# expose SentenceSplitter in the stub module
+fake_node_parser.SentenceSplitter = _StubSentenceSplitter
+
+# Build intermediate modules and insert into sys.modules so nested imports succeed
+fake_core = types.ModuleType("llama_index.core")
+fake_core.node_parser = fake_node_parser
+fake_llama = types.ModuleType("llama_index")
+fake_llama.core = fake_core
+
+# Register them in sys.modules so 'from llama_index.core.node_parser import SentenceSplitter'
+# works when rag.chunking is imported.
+sys.modules["llama_index"] = fake_llama
+sys.modules["llama_index.core"] = fake_core
+sys.modules["llama_index.core.node_parser"] = fake_node_parser
+
+# Now safe to import the module under test
 import rag.chunking as chunking
 
 
