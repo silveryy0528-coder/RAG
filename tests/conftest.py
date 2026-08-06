@@ -156,3 +156,32 @@ class _FakeOpenAI:
 
 fake_openai.OpenAI = _FakeOpenAI
 sys.modules["openai"] = fake_openai
+
+
+# Shared fake model client for tests
+class FakeModelClient:
+    def __init__(self):
+        self.chat = types.SimpleNamespace()
+        self.chat.completions = types.SimpleNamespace()
+        self.chat.completions.create_calls = []
+
+    def set_response(self, content: str):
+        def create(model=None, messages=None, temperature=None):
+            resp = types.SimpleNamespace()
+            choice = types.SimpleNamespace()
+            choice.message = types.SimpleNamespace()
+            choice.message.content = content
+            resp.choices = [choice]
+            create.last_call = {"model": model, "messages": messages, "temperature": temperature}
+            self.chat.completions.create_calls.append(create.last_call)
+            return resp
+
+        self.chat.completions.create = create
+
+
+import pytest
+
+
+@pytest.fixture
+def fake_client():
+    return FakeModelClient()
