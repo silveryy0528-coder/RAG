@@ -23,7 +23,9 @@ class StubSentenceTransformer:
         self.device = device
         self.encode_calls = []
 
-    def encode(self, texts, device=None, convert_to_numpy=None, normalize_embeddings=None):
+    def encode(
+        self, texts, device=None, convert_to_numpy=None, normalize_embeddings=None
+    ):
         self.encode_calls.append(
             {
                 "texts": texts,
@@ -67,3 +69,57 @@ sys.modules["transformers.logging"] = fake_transformers_logging
 fake_sentence_transformers = types.ModuleType("sentence_transformers")
 fake_sentence_transformers.SentenceTransformer = StubSentenceTransformer
 sys.modules["sentence_transformers"] = fake_sentence_transformers
+
+# Stub faiss so indexing code can import it in tests without the real package.
+fake_faiss = types.ModuleType("faiss")
+
+# Metric constant
+fake_faiss.METRIC_L2 = 0
+
+
+class _FakeIndexBase:
+    def __init__(self, *args, **kwargs):
+        self.trained = False
+        self.added = None
+
+    def train(self, embeddings):
+        self.trained = True
+
+    def add(self, embeddings):
+        self.added = embeddings
+
+    def search(self, query_vec, k):
+        # Default: return zeros
+        return [[0.0] * k], [[0] * k]
+
+
+class IndexFlatL2(_FakeIndexBase):
+    def __init__(self, dim):
+        super().__init__()
+        self.dim = dim
+
+
+class IndexIVFFlat(_FakeIndexBase):
+    def __init__(self, quantizer, dim, nlist, metric):
+        super().__init__()
+        self.quantizer = quantizer
+        self.dim = dim
+        self.nlist = nlist
+        self.metric = metric
+
+
+class IndexIVFPQ(_FakeIndexBase):
+    def __init__(self, quantizer, dim, nlist, m, nbits):
+        super().__init__()
+        self.quantizer = quantizer
+        self.dim = dim
+        self.nlist = nlist
+        self.m = m
+        self.nbits = nbits
+
+
+fake_faiss.IndexFlatL2 = IndexFlatL2
+fake_faiss.IndexIVFFlat = IndexIVFFlat
+fake_faiss.IndexIVFPQ = IndexIVFPQ
+
+sys.modules["faiss"] = fake_faiss
