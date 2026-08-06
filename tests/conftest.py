@@ -76,6 +76,7 @@ fake_faiss = types.ModuleType("faiss")
 # Metric constant
 fake_faiss.METRIC_L2 = 0
 
+
 class _FakeIndexBase:
     def __init__(self, *args, **kwargs):
         self.trained = False
@@ -126,6 +127,7 @@ sys.modules["faiss"] = fake_faiss
 # Stub openai (OpenAI client) so rag.llm can import it in tests.
 fake_openai = types.ModuleType("openai")
 
+
 class _FakeChatCompletions:
     def __init__(self):
         self.create_calls = []
@@ -139,14 +141,18 @@ class _FakeChatCompletions:
         content = " ".join(m.get("content", "") for m in (messages or []))
         choice.message.content = content
         resp.choices = [choice]
-        self.create_calls.append({"model": model, "messages": messages, "temperature": temperature})
+        self.create_calls.append(
+            {"model": model, "messages": messages, "temperature": temperature}
+        )
         return resp
+
 
 class _FakeOpenAI:
     def __init__(self, api_key=None):
         self.api_key = api_key
         self.chat = types.SimpleNamespace()
         self.chat.completions = _FakeChatCompletions()
+
 
 fake_openai.OpenAI = _FakeOpenAI
 sys.modules["openai"] = fake_openai

@@ -16,7 +16,11 @@ class FakeClient:
             choice.message = types.SimpleNamespace()
             choice.message.content = content
             resp.choices = [choice]
-            create.calls = {"model": model, "messages": messages, "temperature": temperature}
+            create.calls = {
+                "model": model,
+                "messages": messages,
+                "temperature": temperature,
+            }
             return resp
 
         self.chat.completions.create = create

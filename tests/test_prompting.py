@@ -1,6 +1,11 @@
 import pytest
 
-from rag.prompting import render_template, build_rag_prompt, PromptRenderingError, RAG_PROMPT
+from rag.prompting import (
+    render_template,
+    build_rag_prompt,
+    PromptRenderingError,
+    RAG_PROMPT,
+)
 
 
 def test_render_template_fills_placeholders():
