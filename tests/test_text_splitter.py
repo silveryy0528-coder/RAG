@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-import rag.chunking as chunking
+import rag.text_splitter as chunking
 
 
 class FakeSplitter:

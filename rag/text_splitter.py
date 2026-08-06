@@ -11,12 +11,10 @@ and therefore requires that package at runtime. Tests may stub or monkeypatch
 that dependency as needed.
 """
 
-# %%
 from dataclasses import dataclass
 from llama_index.core.node_parser import SentenceSplitter
 
 
-# %%
 @dataclass
 class ChunkingConfig:
     """Configuration for text chunking.
