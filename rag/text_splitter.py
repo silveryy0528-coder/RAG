@@ -107,7 +107,3 @@ def chunk_text(documents, settings):
     full_text = "\n".join(doc.text for doc in documents)
     nodes = sentence_splitter(full_text, settings.chunk_size, settings.chunk_overlap)
     return nodes
-
-
-if __name__ == "__main__":
-    pass
