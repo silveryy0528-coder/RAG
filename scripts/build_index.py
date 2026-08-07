@@ -105,31 +105,31 @@ def parse_args() -> argparse.Namespace:
         "--raw-dir",
         type=Path,
         default=default_raw,
-        help="Directory containing raw PDF files.",
+        help="Directory containing raw PDF files. (Path)",
     )
     parser.add_argument(
         "--processed-dir",
         type=Path,
         default=default_processed,
-        help="Directory where chunks, embeddings and index are written.",
+        help="Directory where chunks, embeddings and index are written. (Path)",
     )
     parser.add_argument(
         "--device",
         type=str,
         default="cuda",
-        help="Embedding device, e.g. cuda or cpu.",
+        help="Embedding device, e.g. 'cuda' or 'cpu'. (str)",
     )
     parser.add_argument(
         "--chunk-size",
         type=int,
         default=DEFAULT_CHUNK_SIZE,
-        help="Approximate maximum characters per text chunk.",
+        help="Approximate maximum characters per text chunk. (int)",
     )
     parser.add_argument(
         "--chunk-overlap",
         type=int,
         default=DEFAULT_CHUNK_OVERLAP,
-        help="Approximate overlapping characters between chunks.",
+        help="Approximate overlapping characters between chunks. (int)",
     )
     return parser.parse_args()
 

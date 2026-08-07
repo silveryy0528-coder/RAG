@@ -195,17 +195,17 @@ def parse_args() -> argparse.Namespace:
     default_processed = project_root / "data" / "processed"
 
     parser = argparse.ArgumentParser(description="Query the FAISS index and generate a RAG answer.")
-    parser.add_argument("question", type=str, nargs="?", help="Question to ask (if omitted, read from stdin)")
-    parser.add_argument("--processed-dir", type=Path, default=default_processed, help="Directory with chunks.pkl and faiss.index")
-    parser.add_argument("--k", type=int, default=DEFAULT_K, help="Number of top chunks to retrieve")
-    parser.add_argument("--device", type=str, default=DEFAULT_DEVICE, help="Embedder device (cpu or cuda)")
-    parser.add_argument("--model", type=str, default=DEFAULT_MODEL, help="Model name to use for generation")
-    parser.add_argument("--temperature", type=float, default=0.0, help="Sampling temperature for the LLM")
-    parser.add_argument("--api-key", type=str, default=None, help="API key for the OpenAI-like client (can also be provided via env or client default)")
-    parser.add_argument("--show-top-k", action="store_true", help="Print the top-k retrieved chunks")
-    parser.add_argument("--evaluate", action="store_true", help="Evaluate the generated answer using the LLM evaluator and grounding score")
-    parser.add_argument("--eval-model", type=str, default="gpt-3.5-turbo", help="Smaller/cheaper model to use for evaluation (defaults to gpt-3.5-turbo)")
-    parser.add_argument("--output-json", type=Path, default=None, help="Directory or file path to save JSON results (if omitted and --evaluate is set, saves to ./results/)")
+    parser.add_argument("question", type=str, nargs="?", help="Question to ask (if omitted, read from stdin). (str)")
+    parser.add_argument("--processed-dir", type=Path, default=default_processed, help="Directory with chunks.pkl and faiss.index. (Path)")
+    parser.add_argument("--k", type=int, default=DEFAULT_K, help="Number of top chunks to retrieve. (int)")
+    parser.add_argument("--device", type=str, default=DEFAULT_DEVICE, help="Embedder device (cpu or cuda). (str)")
+    parser.add_argument("--model", type=str, default=DEFAULT_MODEL, help="Model name to use for generation. (str)")
+    parser.add_argument("--temperature", type=float, default=0.0, help="Sampling temperature for the LLM. (float)")
+    parser.add_argument("--api-key", type=str, default=None, help="API key for the OpenAI-like client (can also be provided via env or client default). (str)")
+    parser.add_argument("--show-top-k", action="store_true", help="Print the top-k retrieved chunks. (flag)")
+    parser.add_argument("--evaluate", action="store_true", help="Evaluate the generated answer using the LLM evaluator and grounding score. (flag)")
+    parser.add_argument("--eval-model", type=str, default="gpt-3.5-turbo", help="Smaller/cheaper model to use for evaluation (defaults to gpt-3.5-turbo). (str)")
+    parser.add_argument("--output-json", type=Path, default=None, help="Directory or file path to save JSON results (if omitted and --evaluate is set, saves to ./results/). (Path or file)")
     return parser.parse_args()
 
 
