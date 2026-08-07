@@ -28,6 +28,7 @@ from rag.retriever import retrieve_top_k
 from rag.prompting import build_rag_prompt
 from rag.llm import load_openai_client, generate_answer
 from rag import evaluating
+from rag.utils import show_top_k_results, evaluate_generated_answer, save_results_json
 
 
 DEFAULT_K = 3
@@ -81,6 +82,8 @@ def run(
     api_key: str | None,
     show_top_k: bool = False,
     evaluate_answer_flag: bool = False,
+    eval_model: str | None = None,
+    output_json: Path | None = None,
 ) -> str:
     processed_dir = processed_dir.expanduser()
 
@@ -160,61 +163,31 @@ def run(
         ) from exc
 
     # Optionally evaluate the generated answer with the LLM evaluator and grounding score
+    evaluation_result = None
     if evaluate_answer_flag:
         try:
-            evaluate_generated_answer(answer, question, results, client, model_name, temperature)
+            eval_model_name = eval_model or (model_name if model_name else "gpt-3.5-turbo")
+            evaluation_result = evaluate_generated_answer(answer, question, results, client, eval_model_name, temperature)
+            print("\n--- Evaluation summary ---\n")
+            print(f"Grounding score: {evaluation_result.get('grounding_score'):.3f}")
+            print("LLM evaluation:\n")
+            print(evaluation_result.get("llm_evaluation"))
         except Exception as exc:  # pragma: no cover - runtime eval error
             print(f"Evaluation failed: {exc}")
 
+    # Optionally save JSON output
+    if output_json is not None:
+        out_path = Path(output_json)
+        if out_path.exists() and out_path.is_dir():
+            save_dir = out_path
+        else:
+            # Treat provided path as file path -> use parent directory
+            save_dir = out_path if str(out_path).endswith(('/', '\\')) else out_path.parent
+        saved_path = save_results_json(results, answer, evaluation_result, save_dir, prefix="query")
+        print(f"Saved JSON results to {saved_path}")
+
     return answer
 
-
-def show_top_k_results(results: List[dict]) -> None:
-    """Print the retrieved top-k chunks with metadata and scores.
-
-    Parameters
-    ----------
-    results : list[dict]
-        Retrieval results as returned by the search step. Each item should
-        contain at least 'text', 'score', and optional 'doc_id'/'page'.
-    """
-    print("\n--- Top retrieved chunks ---\n")
-    for i, r in enumerate(results, start=1):
-        doc = r.get("doc_id", "UNKNOWN")
-        page = r.get("page", "?")
-        score = r.get("score")
-        text = (r.get("text") or "").strip().replace("\n", " ")
-        print(f"{i}. doc={doc} page={page} score={score:.4f}")
-        print(f"   {text[:400]}\n")
-
-
-def evaluate_generated_answer(
-    answer: str,
-    question: str,
-    results: List[dict],
-    client: object,
-    model_name: str,
-    temperature: float,
-) -> None:
-    """Evaluate the generated answer using the LLM evaluator and grounding score.
-
-    Prints the LLM-based evaluation (YES/NO + reason) and a numeric grounding
-    score computed by token overlap.
-    """
-    context = build_context_from_results(results)
-    print("\n--- Evaluating generated answer ---\n")
-
-    # Grounding score (simple token-overlap heuristic)
-    grounding = evaluating.compute_grounding_score(answer, context)
-    print(f"Grounding score (token overlap fraction): {grounding:.3f}")
-
-    # LLM-based evaluation (asks the model whether the answer is supported)
-    try:
-        res = evaluating.evaluate_answer_with_llm(client, question, answer, context, model_name=model_name, temperature=temperature)
-        print("LLM evaluation response:\n")
-        print(res)
-    except Exception as exc:
-        print(f"LLM-based evaluation failed: {exc}")
 
 
 def parse_args() -> argparse.Namespace:
@@ -231,6 +204,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--api-key", type=str, default=None, help="API key for the OpenAI-like client (can also be provided via env or client default)")
     parser.add_argument("--show-top-k", action="store_true", help="Print the top-k retrieved chunks")
     parser.add_argument("--evaluate", action="store_true", help="Evaluate the generated answer using the LLM evaluator and grounding score")
+    parser.add_argument("--eval-model", type=str, default="gpt-3.5-turbo", help="Smaller/cheaper model to use for evaluation (defaults to gpt-3.5-turbo)")
+    parser.add_argument("--output-json", type=Path, default=None, help="Directory or file path to save JSON results (if omitted and --evaluate is set, saves to ./results/)")
     return parser.parse_args()
 
 
@@ -240,6 +215,10 @@ def main() -> None:
     if not question:
         question = input("Question: ")
 
+    output_json = args.output_json
+    if output_json is None and args.evaluate:
+        output_json = Path("results")
+
     answer = run(
         question=question,
         processed_dir=args.processed_dir,
@@ -248,6 +227,10 @@ def main() -> None:
         model_name=args.model,
         temperature=args.temperature,
         api_key=args.api_key,
+        show_top_k=args.show_top_k,
+        evaluate_answer_flag=args.evaluate,
+        eval_model=args.eval_model,
+        output_json=output_json,
     )
 
     print("\n===== Answer =====\n")
