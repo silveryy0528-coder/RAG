@@ -20,7 +20,7 @@ class FakeEmbedder:
         return [[0.5, 0.6, 0.7]]
 
 
-def test_retrieve_top_k_formats_results():
+def test_retrieve_top_k_WHEN_index_matches_chunks_THEN_formats_results():
     chunks = [
         {"id": "c0", "text": "first", "page": 1, "doc_id": "d0"},
         {"id": "c1", "text": "second", "page": 2},
@@ -41,7 +41,7 @@ def test_retrieve_top_k_formats_results():
     assert results[1]["doc_id"] == "UNKNOWN"
 
 
-def test_retrieve_top_k_raw_returns_search_output():
+def test_retrieve_top_k_raw_WHEN_called_THEN_returns_search_output():
     idx = FakeIndex([[0.1]], [[2]])
     query_vec = [[0.2, 0.3]]
     scores, indices = retrieve_top_k_raw(query_vec, idx, k=1)

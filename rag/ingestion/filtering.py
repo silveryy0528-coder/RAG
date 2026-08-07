@@ -1,6 +1,12 @@
+"""Filtering helpers for PDF ingestion.
+
+This module contains heuristics for normalizing page text, identifying pages
+that should be skipped, and extracting section labels from page headers.
+"""
+
 import re
 from dataclasses import dataclass
-from typing import Sequence, Optional, Iterable
+from typing import Iterable, Optional
 
 SPECIAL_SECTIONS = [
     "list of publications",

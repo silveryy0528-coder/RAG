@@ -7,7 +7,6 @@ keeps model invocation logic thin and delegates prompt construction to the
 """
 
 from typing import Any
-from openai import OpenAI
 
 
 def load_openai_client(api_key=None):
@@ -20,9 +19,17 @@ def load_openai_client(api_key=None):
 
     Returns
     -------
-    OpenAI
+    object
         An OpenAI client instance.
     """
+    try:
+        from openai import OpenAI
+    except ImportError as exc:
+        raise ImportError(
+            "openai is required to create a client. "
+            "Install it or provide a compatible fake module for testing."
+        ) from exc
+
     return OpenAI(api_key=api_key)
 
 

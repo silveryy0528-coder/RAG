@@ -1,3 +1,9 @@
+"""PDF ingestion utilities.
+
+This module reads a PDF file, filters unwanted pages, normalizes page text,
+and produces page-like document objects for further ingestion.
+"""
+
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable, List, Optional
 import os

@@ -5,8 +5,7 @@ helper functions to build an index for given embeddings.
 """
 
 from dataclasses import dataclass
-import numpy as np
-import faiss
+from typing import Any
 
 
 @dataclass
@@ -52,10 +51,14 @@ class FaissIvfpqConfig(FaissConfig):
 
 
 def _build_faiss_flat(dim: int):
+    import faiss
+
     return faiss.IndexFlatL2(dim)
 
 
-def _build_faiss_ivf(embeddings: np.ndarray, dim: int, nlist: int):
+def _build_faiss_ivf(embeddings: Any, dim: int, nlist: int):
+    import faiss
+
     quantizer = faiss.IndexFlatL2(dim)
     index = faiss.IndexIVFFlat(quantizer, dim, nlist, faiss.METRIC_L2)
     # IVF indexes require training
@@ -64,8 +67,10 @@ def _build_faiss_ivf(embeddings: np.ndarray, dim: int, nlist: int):
 
 
 def _build_faiss_ivfpq(
-    embeddings: np.ndarray, dim: int, nlist: int, m: int, nbits: int
+    embeddings: Any, dim: int, nlist: int, m: int, nbits: int
 ):
+    import faiss
+
     quantizer = faiss.IndexFlatL2(dim)
     index = faiss.IndexIVFPQ(quantizer, dim, nlist, m, nbits)
     # IVFPQ requires training as well
@@ -73,7 +78,7 @@ def _build_faiss_ivfpq(
     return index
 
 
-def build_faiss_index(embeddings: np.ndarray, settings: FaissConfig):
+def build_faiss_index(embeddings: Any, settings: FaissConfig):
     """Build and populate a FAISS index according to ``settings``.
 
     Parameters

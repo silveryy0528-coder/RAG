@@ -12,7 +12,8 @@ that dependency as needed.
 """
 
 from dataclasses import dataclass
-from llama_index.core.node_parser import SentenceSplitter
+
+SentenceSplitter = None
 
 
 @dataclass
@@ -44,9 +45,9 @@ class ChunkingSentenceConfig(ChunkingConfig):
 def sentence_splitter(full_text, chunk_size, chunk_overlap):
     """Split full text into sentence-based nodes.
 
-    This function constructs a ``SentenceSplitter`` with the provided
-    ``chunk_size`` and ``chunk_overlap`` and returns the nodes produced by
-    its ``split_text`` method.
+    This function lazily imports ``SentenceSplitter`` from
+    ``llama_index.core.node_parser`` to avoid requiring the dependency at
+    module import time.
 
     Parameters
     ----------
@@ -61,7 +62,22 @@ def sentence_splitter(full_text, chunk_size, chunk_overlap):
     -------
     list
         The nodes produced by :meth:`SentenceSplitter.split_text`.
+
+    Raises
+    ------
+    ImportError
+        If ``llama_index`` is not installed.
     """
+    global SentenceSplitter
+    if SentenceSplitter is None:
+        try:
+            from llama_index.core.node_parser import SentenceSplitter as ImportedSentenceSplitter
+            SentenceSplitter = ImportedSentenceSplitter
+        except ImportError as exc:
+            raise ImportError(
+                "llama_index is required for sentence splitting. "
+                "Install it or provide a compatible fake module for testing."
+            ) from exc
 
     splitter = SentenceSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
     nodes = splitter.split_text(full_text)

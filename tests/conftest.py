@@ -172,7 +172,11 @@ class FakeModelClient:
             choice.message = types.SimpleNamespace()
             choice.message.content = content
             resp.choices = [choice]
-            create.last_call = {"model": model, "messages": messages, "temperature": temperature}
+            create.last_call = {
+                "model": model,
+                "messages": messages,
+                "temperature": temperature,
+            }
             self.chat.completions.create_calls.append(create.last_call)
             return resp
 

@@ -20,7 +20,9 @@ class FakeSplitter:
         ]
 
 
-def test_sentence_splitter_passes_arguments_and_returns_nodes(monkeypatch):
+def test_sentence_splitter_WHEN_called_with_chunk_parameters_THEN_forwards_arguments_and_returns_nodes(
+    monkeypatch,
+):
     monkeypatch.setattr(chunking, "SentenceSplitter", FakeSplitter)
 
     full_text = "hello world"
@@ -32,7 +34,9 @@ def test_sentence_splitter_passes_arguments_and_returns_nodes(monkeypatch):
     assert nodes[0]["chunk_overlap"] == 45
 
 
-def test_chunk_text_joins_documents_and_uses_settings(monkeypatch):
+def test_chunk_text_WHEN_documents_joined_and_settings_provided_THEN_uses_settings_for_splitter(
+    monkeypatch,
+):
     monkeypatch.setattr(chunking, "SentenceSplitter", FakeSplitter)
 
     docs = [SimpleNamespace(text="first"), SimpleNamespace(text="second")]
@@ -45,7 +49,7 @@ def test_chunk_text_joins_documents_and_uses_settings(monkeypatch):
     assert nodes[0]["chunk_overlap"] == 2
 
 
-def test_config_dataclass_defaults():
+def test_ChunkingConfig_WHEN_default_constructed_THEN_uses_expected_defaults():
     cfg = chunking.ChunkingConfig()
     assert cfg.chunk_size == 500
 

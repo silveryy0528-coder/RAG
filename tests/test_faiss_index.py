@@ -9,24 +9,23 @@ from rag.faiss_index import (
 )
 
 
-def test_build_flat_index_adds_embeddings():
+def test_build_faiss_index_WHEN_flat_config_provided_THEN_adds_embeddings():
     embeddings = np.random.rand(5, 3).astype("float32")
     cfg = FaissFlatConfig()
 
     index = build_faiss_index(embeddings, cfg)
 
-    # Our fake index stores added embeddings in .added
     assert hasattr(index, "added")
     assert index.added.shape == embeddings.shape
 
 
-def test_build_raises_with_wrong_settings():
+def test_build_faiss_index_WHEN_settings_invalid_THEN_raises_type_error():
     embeddings = np.zeros((2, 4), dtype="float32")
     with pytest.raises(TypeError):
         build_faiss_index(embeddings, settings="not-a-config")
 
 
-def test_build_ivf_and_ivfpq_train_and_add():
+def test_build_faiss_index_WHEN_ivf_and_ivfpq_configs_provided_THEN_trains_and_adds():
     embeddings = np.random.rand(10, 8).astype("float32")
 
     ivf_cfg = FaissIvfConfig(nlist=10)

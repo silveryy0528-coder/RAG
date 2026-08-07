@@ -24,7 +24,7 @@ class FakePage:
         return self._full_text
 
 
-def test_clean_text_replaces_nonbreaking_spaces_and_tabs():
+def test_clean_text_WHEN_called_THEN_replaces_nonbreaking_spaces_tabs_and_hyphen_newlines():
     raw = "Hello\xa0world\tand\nnew-lines -\nbroken"
     cleaned = filtering.clean_text(raw)
     assert "\xa0" not in cleaned
@@ -32,25 +32,27 @@ def test_clean_text_replaces_nonbreaking_spaces_and_tabs():
     assert "-\n" not in cleaned
 
 
-def test_is_bad_page_detects_empty_and_toc():
+def test_is_bad_page_WHEN_page_is_empty_or_toc_THEN_returns_true():
     assert filtering.is_bad_page("")
     assert filtering.is_bad_page("   ")
     assert filtering.is_bad_page("1 . . . . . 2")
 
 
-def test_extract_section_name_falls_back_to_header():
+def test_extract_section_name_WHEN_header_contains_special_section_THEN_returns_that_section():
     p = FakePage(header_text="Summary of contributions", full_text="")
     name = filtering.extract_section_name(p)
     assert name == "summary"
 
 
-def test_extract_section_name_checks_full_text_when_header_empty():
-    p = FakePage(header_text="", full_text="This thesis contains propositions and other text")
+def test_extract_section_name_WHEN_header_empty_and_full_text_contains_special_section_THEN_returns_that_section():
+    p = FakePage(
+        header_text="", full_text="This thesis contains propositions and other text"
+    )
     name = filtering.extract_section_name(p)
     assert name == "propositions"
 
 
-def test_extract_section_name_returns_body_when_header_not_empty_and_no_special_section():
+def test_extract_section_name_WHEN_header_contains_non_special_text_THEN_returns_body():
     p = FakePage(header_text="Chapter 1: Introduction", full_text="Intro text")
     name = filtering.extract_section_name(p)
     assert name == "body"
