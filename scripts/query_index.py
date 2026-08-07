@@ -84,7 +84,7 @@ def run(
     evaluate_answer_flag: bool = False,
     eval_model: str | None = None,
     output_json: Path | None = None,
-) -> str:
+) -> tuple[str, dict | None]:
     processed_dir = processed_dir.expanduser()
 
     # Load resources
@@ -168,10 +168,6 @@ def run(
         try:
             eval_model_name = eval_model or (model_name if model_name else "gpt-3.5-turbo")
             evaluation_result = evaluate_generated_answer(answer, question, results, client, eval_model_name, temperature)
-            print("\n--- Evaluation summary ---\n")
-            print(f"Grounding score: {evaluation_result.get('grounding_score'):.3f}")
-            print("LLM evaluation:\n")
-            print(evaluation_result.get("llm_evaluation"))
         except Exception as exc:  # pragma: no cover - runtime eval error
             print(f"Evaluation failed: {exc}")
 
@@ -186,7 +182,7 @@ def run(
         saved_path = save_results_json(results, answer, evaluation_result, save_dir, prefix="query")
         print(f"Saved JSON results to {saved_path}")
 
-    return answer
+    return answer, evaluation_result
 
 
 
@@ -219,7 +215,7 @@ def main() -> None:
     if output_json is None and args.evaluate:
         output_json = Path("results")
 
-    answer = run(
+    answer, evaluation_result = run(
         question=question,
         processed_dir=args.processed_dir,
         k=args.k,
@@ -235,6 +231,17 @@ def main() -> None:
 
     print("\n===== Answer =====\n")
     print(answer)
+
+    # Print evaluation summary after the answer (if present)
+    if evaluation_result is not None:
+        print("\n--- Evaluation summary ---\n")
+        try:
+            grounding = evaluation_result.get("grounding_score")
+            print(f"Grounding score: {grounding:.3f}")
+        except Exception:
+            pass
+        print("LLM evaluation:\n")
+        print(evaluation_result.get("llm_evaluation"))
 
 
 if __name__ == "__main__":
