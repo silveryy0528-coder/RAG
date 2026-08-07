@@ -27,6 +27,7 @@ from rag.embedding import load_embedder
 from rag.retriever import retrieve_top_k
 from rag.prompting import build_rag_prompt
 from rag.llm import load_openai_client, generate_answer
+from rag import evaluating
 
 
 DEFAULT_K = 3
@@ -78,6 +79,8 @@ def run(
     model_name: str,
     temperature: float,
     api_key: str | None,
+    show_top_k: bool = False,
+    evaluate_answer_flag: bool = False,
 ) -> str:
     processed_dir = processed_dir.expanduser()
 
@@ -145,6 +148,10 @@ def run(
             f"Failed to create OpenAI client: {exc}. Provide OPENAI_API_KEY or --api-key."
         ) from exc
 
+    # Optionally show retrieved chunks
+    if show_top_k:
+        show_top_k_results(results)
+
     try:
         answer = generate_answer(client, prompt, model_name=model_name, temperature=temperature)
     except Exception as exc:  # pragma: no cover - runtime generation error
@@ -152,7 +159,62 @@ def run(
             f"Model generation failed: {exc}. Check that the client supports chat.completions.create and that model credentials are valid."
         ) from exc
 
+    # Optionally evaluate the generated answer with the LLM evaluator and grounding score
+    if evaluate_answer_flag:
+        try:
+            evaluate_generated_answer(answer, question, results, client, model_name, temperature)
+        except Exception as exc:  # pragma: no cover - runtime eval error
+            print(f"Evaluation failed: {exc}")
+
     return answer
+
+
+def show_top_k_results(results: List[dict]) -> None:
+    """Print the retrieved top-k chunks with metadata and scores.
+
+    Parameters
+    ----------
+    results : list[dict]
+        Retrieval results as returned by the search step. Each item should
+        contain at least 'text', 'score', and optional 'doc_id'/'page'.
+    """
+    print("\n--- Top retrieved chunks ---\n")
+    for i, r in enumerate(results, start=1):
+        doc = r.get("doc_id", "UNKNOWN")
+        page = r.get("page", "?")
+        score = r.get("score")
+        text = (r.get("text") or "").strip().replace("\n", " ")
+        print(f"{i}. doc={doc} page={page} score={score:.4f}")
+        print(f"   {text[:400]}\n")
+
+
+def evaluate_generated_answer(
+    answer: str,
+    question: str,
+    results: List[dict],
+    client: object,
+    model_name: str,
+    temperature: float,
+) -> None:
+    """Evaluate the generated answer using the LLM evaluator and grounding score.
+
+    Prints the LLM-based evaluation (YES/NO + reason) and a numeric grounding
+    score computed by token overlap.
+    """
+    context = build_context_from_results(results)
+    print("\n--- Evaluating generated answer ---\n")
+
+    # Grounding score (simple token-overlap heuristic)
+    grounding = evaluating.compute_grounding_score(answer, context)
+    print(f"Grounding score (token overlap fraction): {grounding:.3f}")
+
+    # LLM-based evaluation (asks the model whether the answer is supported)
+    try:
+        res = evaluating.evaluate_answer_with_llm(client, question, answer, context, model_name=model_name, temperature=temperature)
+        print("LLM evaluation response:\n")
+        print(res)
+    except Exception as exc:
+        print(f"LLM-based evaluation failed: {exc}")
 
 
 def parse_args() -> argparse.Namespace:
@@ -167,6 +229,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model", type=str, default=DEFAULT_MODEL, help="Model name to use for generation")
     parser.add_argument("--temperature", type=float, default=0.0, help="Sampling temperature for the LLM")
     parser.add_argument("--api-key", type=str, default=None, help="API key for the OpenAI-like client (can also be provided via env or client default)")
+    parser.add_argument("--show-top-k", action="store_true", help="Print the top-k retrieved chunks")
+    parser.add_argument("--evaluate", action="store_true", help="Evaluate the generated answer using the LLM evaluator and grounding score")
     return parser.parse_args()
 
 
