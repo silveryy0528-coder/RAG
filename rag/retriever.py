@@ -50,7 +50,12 @@ def _extract_query_terms(question: str) -> set[str]:
     }
 
 
-def _chunk_to_result(chunk: Any, score: float, question: str) -> Dict[str, Any]:
+def _chunk_to_result(
+    chunk: Any,
+    score: float,
+    question: str,
+    use_metadata_reranking: bool = False,
+) -> Dict[str, Any]:
     if isinstance(chunk, dict):
         text = chunk.get("text")
         metadata = chunk.get("metadata") or {}
@@ -66,7 +71,7 @@ def _chunk_to_result(chunk: Any, score: float, question: str) -> Dict[str, Any]:
         page = metadata.get("page")
         section = metadata.get("section")
 
-    metadata_boost = _metadata_boost(question, section)
+    metadata_boost = _metadata_boost(question, section) if use_metadata_reranking else 0.0
     result = {
         "id": chunk_id,
         "text": text,
@@ -88,24 +93,21 @@ def _metadata_boost(question: str, section: str | None) -> float:
     if not query_terms:
         return 0.0
 
-    if section_name in {"structural"}:
-        return -0.35
-
-    if section_name in {"body"}:
+    if section_name in {"structural", "body"}:
         return 0.0
 
     if section_name in {"summary", "acknowledgements", "about the author", "samenvatting", "stellingen", "copyright", "references"}:
         if any(term in section_name for term in query_terms):
-            return 0.1
-        return -0.8
+            return 0.02
+        return -0.03
 
     if section_name in SPECIAL_SECTIONS:
         if any(term in section_name for term in query_terms):
-            return 0.15
-        return -0.6
+            return 0.03
+        return -0.02
 
     if any(term in section_name for term in query_terms):
-        return 0.15
+        return 0.03
 
     return 0.0
 
@@ -117,6 +119,7 @@ def retrieve_top_k(
     faiss_index,
     k: int = 3,
     candidate_multiplier: int = 3,
+    use_metadata_reranking: bool = False,
 ) -> List[Dict[str, Any]]:
     """Retrieve top-k matching chunks for a question.
 
@@ -137,6 +140,10 @@ def retrieve_top_k(
     candidate_multiplier : int, optional
         How many candidates to collect before reranking. A larger value gives the
         metadata-based reranker more room to recover better matches.
+    use_metadata_reranking : bool, optional
+        If True, rerank the retrieved candidates using section metadata. The
+        default is False so the original semantic similarity ordering is preserved
+        unless explicitly enabled.
 
     Returns
     -------
@@ -154,10 +161,20 @@ def retrieve_top_k(
         if idx < 0 or idx >= len(chunks):
             continue
         chunk = chunks[idx]
-        results.append(_chunk_to_result(chunk, score, question))
+        results.append(
+            _chunk_to_result(
+                chunk,
+                score,
+                question,
+                use_metadata_reranking=use_metadata_reranking,
+            )
+        )
 
-    ranked_results = sorted(results, key=lambda item: item["score"], reverse=True)
-    return ranked_results[:k]
+    if use_metadata_reranking:
+        ranked_results = sorted(results, key=lambda item: item["score"], reverse=True)
+        return ranked_results[:k]
+
+    return results[:k]
 
 
 def retrieve_top_k_raw(query_vec, faiss_index, k: int = 3):

@@ -84,6 +84,7 @@ def run(
     evaluate_answer_flag: bool = False,
     eval_model: str | None = None,
     output_json: Path | None = None,
+    use_metadata_reranking: bool = False,
 ) -> tuple[str, dict | None]:
     processed_dir = processed_dir.expanduser()
 
@@ -94,7 +95,14 @@ def run(
     # Prepare embedder and client
     embedder = load_embedder(device=device)
 
-    results = retrieve_top_k(question, chunks, embedder, index, k=k)
+    results = retrieve_top_k(
+        question,
+        chunks,
+        embedder,
+        index,
+        k=k,
+        use_metadata_reranking=use_metadata_reranking,
+    )
 
     if not results:
         raise RuntimeError("No retrieval results — check that index and chunks match")
@@ -174,6 +182,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--evaluate", action="store_true", help="Evaluate the generated answer using the LLM evaluator and grounding score. (flag)")
     parser.add_argument("--eval-model", type=str, default="gpt-3.5-turbo", help="Smaller/cheaper model to use for evaluation (defaults to gpt-3.5-turbo). (str)")
     parser.add_argument("--output-json", type=Path, default=None, help="Directory or file path to save JSON results (if omitted and --evaluate is set, saves to ./results/). (Path or file)")
+    parser.add_argument("--use-metadata-reranking", action="store_true", help="Rerank the retrieved chunks using section metadata. (flag)")
     return parser.parse_args()
 
 
@@ -199,6 +208,7 @@ def main() -> None:
         evaluate_answer_flag=args.evaluate,
         eval_model=args.eval_model,
         output_json=output_json,
+        use_metadata_reranking=args.use_metadata_reranking,
     )
 
     print("\n===== Answer =====\n")

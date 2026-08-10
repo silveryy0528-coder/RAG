@@ -59,14 +59,36 @@ def test_retrieve_top_k_WHEN_special_section_is_ranked_THEN_demotes_it():
         },
     ]
 
-    idx = FakeIndex([[0.9, 0.8]], [[0, 1]])
+    idx = FakeIndex([[0.8, 0.9]], [[0, 1]])
     embedder = FakeEmbedder()
 
-    results = retrieve_top_k("What is the main contribution?", chunks, embedder, idx, k=2)
+    results = retrieve_top_k(
+        "What is the main contribution?",
+        chunks,
+        embedder,
+        idx,
+        k=2,
+        use_metadata_reranking=True,
+    )
 
     assert results[0]["id"] == "body"
     assert results[0]["section"] == "body"
     assert results[1]["id"] == "special"
+
+
+def test_retrieve_top_k_WHEN_reranking_is_disabled_THEN_preserves_faiss_order():
+    chunks = [
+        {"id": "special", "text": "special", "page": 2, "doc_id": "d0", "metadata": {"section": "propositions"}},
+        {"id": "body", "text": "body", "page": 3, "doc_id": "d0", "metadata": {"section": "body"}},
+    ]
+
+    idx = FakeIndex([[0.8, 0.9]], [[0, 1]])
+    embedder = FakeEmbedder()
+
+    results = retrieve_top_k("What is the main contribution?", chunks, embedder, idx, k=2)
+
+    assert results[0]["id"] == "special"
+    assert results[1]["id"] == "body"
 
 
 def test_retrieve_top_k_raw_WHEN_called_THEN_returns_search_output():

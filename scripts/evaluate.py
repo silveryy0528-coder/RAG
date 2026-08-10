@@ -79,6 +79,11 @@ def parse_args() -> argparse.Namespace:
         default=0,
         help="Print the N worst-performing examples by F1 and retrieval overlap. (int)",
     )
+    parser.add_argument(
+        "--use-metadata-reranking",
+        action="store_true",
+        help="Rerank the retrieved chunks using section metadata. (flag)",
+    )
     return parser.parse_args()
 
 
@@ -161,6 +166,7 @@ def main() -> None:
         api_key=args.api_key,
         model_name=args.model,
         temperature=args.temperature,
+        use_metadata_reranking=args.use_metadata_reranking,
     )
 
     print_summary(summary)

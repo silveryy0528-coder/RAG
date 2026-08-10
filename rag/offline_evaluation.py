@@ -388,6 +388,7 @@ def run_offline_evaluation(
     api_key: Optional[str] = None,
     model_name: str = "gpt-4.1-mini",
     temperature: float = 0.0,
+    use_metadata_reranking: bool = False,
 ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
     """Run a batch offline evaluation over a QA dataset.
 
@@ -414,6 +415,9 @@ def run_offline_evaluation(
         Model identifier passed to the LLM client.
     temperature : float
         Sampling temperature for the LLM.
+    use_metadata_reranking : bool
+        If True, rerank retrieved candidates using section metadata. Defaults to
+        False so semantic similarity remains the primary signal.
 
     Returns
     -------
@@ -431,7 +435,14 @@ def run_offline_evaluation(
     for example in dataset:
         question = example.get("question", "")
         reference = example.get("ground_truth_answer", "")
-        result_rows = retrieve_top_k(question, chunks, embedder, index, k)
+        result_rows = retrieve_top_k(
+            question,
+            chunks,
+            embedder,
+            index,
+            k,
+            use_metadata_reranking=use_metadata_reranking,
+        )
         prediction = None
         if generate_answers:
             prompt = build_rag_prompt(question, build_context_from_results(result_rows))
