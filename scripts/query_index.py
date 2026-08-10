@@ -26,7 +26,12 @@ from rag.embedding import load_embedder
 from rag.retriever import retrieve_top_k
 from rag.prompting import build_rag_prompt
 from rag.llm import load_openai_client, generate_answer
-from rag.utils import show_top_k_results, evaluate_generated_answer, save_results_json
+from rag.utils import (
+    build_context_from_results,
+    show_top_k_results,
+    evaluate_generated_answer,
+    save_results_json,
+)
 
 
 DEFAULT_K = 3
@@ -53,23 +58,6 @@ def load_faiss_index(processed_dir: Path) -> faiss.Index:
         raise FileNotFoundError(f"FAISS index not found: {index_file}")
     index = faiss.read_index(str(index_file))
     return index
-
-
-def build_context_from_results(results: List[dict]) -> str:
-    # Concatenate top results into a single context block. Add simple separators.
-    parts = []
-    for i, r in enumerate(results, start=1):
-        text = r.get("text") or r.get("content") or ""
-        meta = []
-        if r.get("doc_id"):
-            meta.append(f"doc:{r.get('doc_id')}")
-        if r.get("page"):
-            meta.append(f"page:{r.get('page')}")
-        if r.get("section"):
-            meta.append(f"section:{r.get('section')}")
-        header = f"[chunk {i} {'|'.join(meta)}]" if meta else f"[chunk {i}]"
-        parts.append(header + "\n" + text)
-    return "\n\n".join(parts)
 
 
 def run(

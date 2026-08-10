@@ -31,6 +31,7 @@ from rag.llm import generate_answer, load_openai_client
 from rag.prompting import build_rag_prompt
 from rag.retriever import retrieve_top_k
 from rag.runtime_evaluation import compute_grounding_score
+from rag.utils import build_context_from_results
 
 
 NOT_FOUND_PHRASES = [
@@ -191,28 +192,6 @@ def chunks_to_dicts(chunks: Iterable[Any]) -> List[Dict[str, Any]]:
     shapes into a consistent dict form used by the evaluation pipeline.
     """
     return [_chunk_to_dict(chunk) for chunk in chunks]
-
-
-def build_context_from_results(results: Sequence[Dict[str, Any]]) -> str:
-    """Concatenate retrieved results into a single context string.
-
-    Each retrieved chunk is prefixed with a small header that includes the
-    document id, page and section to aid debugging and provide traceability
-    when the context is shown or passed to an evaluator LLM.
-    """
-    parts: List[str] = []
-    for i, result in enumerate(results, start=1):
-        meta = []
-        if result.get("doc_id"):
-            meta.append(f"doc={result.get('doc_id')}")
-        if result.get("page") is not None:
-            meta.append(f"page={result.get('page')}")
-        if result.get("section"):
-            meta.append(f"section={result.get('section')}")
-        header = f"[chunk {i} {'|'.join(meta)}]" if meta else f"[chunk {i}]"
-        parts.append(header)
-        parts.append(result.get("text", ""))
-    return "\n\n".join(parts)
 
 
 def compute_retrieval_overlap(reference: str, results: Sequence[Dict[str, Any]]) -> float:

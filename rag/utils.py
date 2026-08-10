@@ -8,9 +8,32 @@ from __future__ import annotations
 from datetime import datetime
 import json
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Sequence
 
 from rag.runtime_evaluation import compute_grounding_score, evaluate_answer_with_llm
+
+
+def build_context_from_results(results: Sequence[Dict[str, Any]]) -> str:
+    """Format retrieved results as a single context block.
+
+    The helper adds lightweight metadata headers so downstream prompts and
+    debugging output can trace where each piece of context came from.
+    """
+    parts: List[str] = []
+    for i, result in enumerate(results, start=1):
+        text = result.get("text") or result.get("content") or ""
+        meta = []
+        if result.get("doc_id"):
+            meta.append(f"doc={result.get('doc_id')}")
+        if result.get("page") is not None:
+            meta.append(f"page={result.get('page')}")
+        if result.get("section"):
+            meta.append(f"section={result.get('section')}")
+
+        header = f"[chunk {i} {'|'.join(meta)}]" if meta else f"[chunk {i}]"
+        parts.append(header)
+        parts.append(text)
+    return "\n\n".join(parts)
 
 
 def show_top_k_results(results: List[Dict[str, Any]]) -> None:
