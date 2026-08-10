@@ -27,7 +27,6 @@ from rag.embedding import load_embedder
 from rag.retriever import retrieve_top_k
 from rag.prompting import build_rag_prompt
 from rag.llm import load_openai_client, generate_answer
-from rag import evaluating
 from rag.utils import show_top_k_results, evaluate_generated_answer, save_results_json
 
 

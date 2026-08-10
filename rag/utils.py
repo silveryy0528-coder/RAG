@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 from typing import List, Dict, Any
 
-from rag import evaluating
+from rag.runtime_evaluation import compute_grounding_score, evaluate_answer_with_llm
 
 
 def show_top_k_results(results: List[Dict[str, Any]]) -> None:
@@ -49,11 +49,18 @@ def evaluate_generated_answer(
         (f"[chunk {i+1}]\n" + (r.get("text") or "")) for i, r in enumerate(results)
     )
 
-    grounding = evaluating.compute_grounding_score(answer, context)
+    grounding = compute_grounding_score(answer, context)
 
     llm_eval = None
     try:
-        llm_eval = evaluating.evaluate_answer_with_llm(client, question, answer, context, model_name=model_name, temperature=temperature)
+        llm_eval = evaluate_answer_with_llm(
+            client,
+            question,
+            answer,
+            context,
+            model_name=model_name,
+            temperature=temperature,
+        )
     except Exception as exc:
         llm_eval = f"LLM evaluation failed: {exc}"
 
