@@ -110,6 +110,40 @@ def test_retrieve_top_k_WHEN_chunk_text_matches_query_THEN_gives_small_boost():
     assert results[1]["id"] == "body"
 
 
+def test_retrieve_top_k_WHEN_technical_query_matches_thesis_THEN_prefers_thesis_over_cv():
+    chunks = [
+        {
+            "id": "cv",
+            "text": "Data scientist with broad imaging experience.",
+            "page": 1,
+            "doc_id": "CV_YanGuo.pdf",
+            "metadata": {"section": "body"},
+        },
+        {
+            "id": "thesis",
+            "text": "HAADF-STEM and EDS cross-modal fusion are discussed here.",
+            "page": 2,
+            "doc_id": "Final_thesis_Yan.pdf",
+            "metadata": {"section": "body"},
+        },
+    ]
+
+    idx = FakeIndex([[0.95, 0.94]], [[0, 1]])
+    embedder = FakeEmbedder()
+
+    results = retrieve_top_k(
+        "What limitations or challenges of the HAADF-EDS cross-modal fusion framework are discussed in the thesis?",
+        chunks,
+        embedder,
+        idx,
+        k=2,
+        use_metadata_reranking=True,
+    )
+
+    assert results[0]["id"] == "thesis"
+    assert results[1]["id"] == "cv"
+
+
 def test_retrieve_top_k_WHEN_reranking_is_disabled_THEN_preserves_faiss_order():
     chunks = [
         {"id": "special", "text": "special", "page": 2, "doc_id": "d0", "metadata": {"section": "propositions"}},

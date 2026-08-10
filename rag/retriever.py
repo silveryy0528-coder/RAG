@@ -9,6 +9,7 @@ from typing import List, Dict, Any
 
 from rag.embedding import embed_text
 
+# General retrieval helpers
 _STOPWORDS = {
     "a",
     "an",
@@ -37,6 +38,21 @@ _STOPWORDS = {
     "who",
     "why",
     "with",
+}
+
+# Thesis-specific query terms used to bias retrieval toward the dissertation.
+_TECHNICAL_QUERY_TERMS = {
+    "haadf",
+    "eds",
+    "stem",
+    "tomography",
+    "fusion",
+    "cross",
+    "modal",
+    "bimodal",
+    "multichannel",
+    "reconstruction",
+    "regularization",
 }
 
 
@@ -106,7 +122,7 @@ def _chunk_to_result(
     section = fields["section"]
 
     metadata_boost = (
-        _metadata_boost(question, section, text) if use_metadata_reranking else 0.0
+        _metadata_boost(question, doc_id, section, text) if use_metadata_reranking else 0.0
     )
     result = {
         "id": chunk_id,
@@ -120,13 +136,30 @@ def _chunk_to_result(
     return result
 
 
-def _metadata_boost(question: str, section: str | None, text: str | None) -> float:
+def _is_technical_query(normalized_query_terms: set[str]) -> bool:
+    """Return True when the query looks like a thesis-technical question."""
+    return any(term in _TECHNICAL_QUERY_TERMS for term in normalized_query_terms)
+
+
+def _is_cv_doc(doc_id: str | None) -> bool:
+    """Return True when the chunk comes from the CV document."""
+    return bool(doc_id) and str(doc_id).lower().startswith("cv")
+
+
+def _metadata_boost(
+    question: str, doc_id: str | None, section: str | None, text: str | None
+) -> float:
     """Compute a small score bonus for direct query overlap."""
     query_terms = _extract_query_terms(question)
     if not query_terms:
         return 0.0
 
     normalized_query_terms = {_normalize_token(term) for term in query_terms}
+    technical_query = _is_technical_query(normalized_query_terms)
+
+    # Thesis-specific: downrank CV chunks for technical thesis questions.
+    if technical_query and _is_cv_doc(doc_id):
+        return -0.25
 
     if section:
         section_name = str(section).strip().lower()
@@ -141,7 +174,7 @@ def _metadata_boost(question: str, section: str | None, text: str | None) -> flo
                 if term and term in normalized_section_tokens
             ]
             if explicit_section_matches:
-                return 0.04
+                return 0.08 if technical_query else 0.04
 
     if text:
         normalized_text_tokens = {
@@ -154,27 +187,28 @@ def _metadata_boost(question: str, section: str | None, text: str | None) -> flo
             if term and term in normalized_text_tokens
         ]
         if explicit_text_matches:
-            return 0.02
+            return 0.18 if technical_query else 0.02
 
     return 0.0
 
 
 def _intent_match_candidates(
     question: str, chunks: List[Dict[str, Any]]
-) -> List[tuple[int, Dict[str, Any]]]:
+) -> List[tuple[int, Dict[str, Any], int]]:
     """Find chunks that explicitly match the query intent."""
     query_terms = _extract_query_terms(question)
     normalized_query_terms = {_normalize_token(term) for term in query_terms}
     if not normalized_query_terms:
         return []
 
+    # Thesis-specific intent shortcuts for titles and publication pages.
     intent_terms = set(normalized_query_terms)
     if "publication" in normalized_query_terms or "publicat" in normalized_query_terms:
         intent_terms = {"publication", "publications", "publicat"}
     elif "title" in normalized_query_terms or "thesis" in normalized_query_terms:
         intent_terms = {"title", "thesis", "dissertation", "proefschrift"}
 
-    candidates: List[tuple[int, Dict[str, Any]]] = []
+    candidates: List[tuple[int, Dict[str, Any], int]] = []
     for index, chunk in enumerate(chunks):
         fields = _chunk_fields(chunk)
         text = fields["text"] or ""
@@ -187,12 +221,14 @@ def _intent_match_candidates(
             _normalize_token(token)
             for token in re.findall(r"[a-z0-9]+", (text or "").lower())
         }
-        if any(
+        matched_terms = {
             term
             for term in intent_terms
-            if term and term in normalized_section_tokens | normalized_text_tokens
-        ):
-            candidates.append((index, chunk))
+            if term
+            and (term in normalized_section_tokens or term in normalized_text_tokens)
+        }
+        if matched_terms:
+            candidates.append((index, chunk, len(matched_terms)))
 
     return candidates
 
@@ -210,6 +246,7 @@ def retrieve_top_k(
     query_vec = embed_text(embedder, texts=[question])
     search_k = max(k * candidate_multiplier, k)
     if use_metadata_reranking:
+        # Thesis-specific: widen the candidate pool for hard special-page queries.
         search_k = max(search_k, k * 8)
     scores, indices = retrieve_top_k_raw(query_vec, faiss_index, search_k)
 
@@ -217,11 +254,13 @@ def retrieve_top_k(
     seen_indices = set()
     if use_metadata_reranking:
         intent_matches = _intent_match_candidates(question, chunks)
-        for chunk_index, chunk in intent_matches[: max(k * 2, k)]:
+        for chunk_index, chunk, boost in sorted(
+            intent_matches, key=lambda item: item[2], reverse=True
+        )[: max(k * 2, k)]:
             result = _chunk_to_result(
                 chunk, 0.0, question, use_metadata_reranking=False
             )
-            result["score"] += 3.0
+            result["score"] += 3.0 + boost
             if chunk_index in seen_indices:
                 continue
             seen_indices.add(chunk_index)
