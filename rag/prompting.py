@@ -13,26 +13,7 @@ class PromptRenderingError(ValueError):
 
 
 def render_template(template: str, params: Mapping[str, object]) -> str:
-    """Render a template using ``params``.
-
-    Parameters
-    ----------
-    template : str
-        Template string using Python ``str.format`` placeholders, e.g.
-        "Answer: {answer}".
-    params : Mapping[str, object]
-        Mapping of placeholder names to values.
-
-    Returns
-    -------
-    str
-        The rendered string.
-
-    Raises
-    ------
-    PromptRenderingError
-        If a placeholder in the template is not provided in ``params``.
-    """
+    """Render a template using ``params``."""
     try:
         return template.format(**params)
     except KeyError as e:
@@ -54,20 +35,7 @@ RAG_PROMPT = (
 
 
 def build_rag_prompt(question: str, context: str) -> str:
-    """Build a RAG prompt by rendering the RAG_PROMPT template.
-
-    Parameters
-    ----------
-    question : str
-        The user question.
-    context : str
-        The contextual text used to answer the question.
-
-    Returns
-    -------
-    str
-        The rendered prompt string ready to send to an LLM.
-    """
+    """Build a RAG prompt."""
     return render_template(RAG_PROMPT, {"question": question, "context": context})
 
 
@@ -98,40 +66,12 @@ RELEVANCE_PROMPT = (
 
 
 def build_evaluation_prompt(question: str, answer: str, context: str) -> str:
-    """Render the evaluation prompt for answer correctness.
-
-    Parameters
-    ----------
-    question : str
-        The user question.
-    answer : str
-        The candidate answer to evaluate.
-    context : str
-        The context used to produce the answer.
-
-    Returns
-    -------
-    str
-        The rendered evaluation prompt.
-    """
+    """Build the evaluation prompt."""
     return render_template(
         EVALUATION_PROMPT, {"question": question, "answer": answer, "context": context}
     )
 
 
 def build_relevance_prompt(question: str, chunk: str) -> str:
-    """Render the prompt asking whether a retrieved chunk is relevant.
-
-    Parameters
-    ----------
-    question : str
-        The user question.
-    chunk : str
-        The retrieved chunk text.
-
-    Returns
-    -------
-    str
-        The rendered relevance prompt.
-    """
+    """Build the relevance prompt."""
     return render_template(RELEVANCE_PROMPT, {"question": question, "chunk": chunk})

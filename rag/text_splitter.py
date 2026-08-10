@@ -43,35 +43,14 @@ class ChunkingSentenceConfig(ChunkingConfig):
 
 
 def sentence_splitter(full_text, chunk_size, chunk_overlap):
-    """Split full text into sentence-based nodes.
-
-    This function lazily imports ``SentenceSplitter`` from
-    ``llama_index.core.node_parser`` to avoid requiring the dependency at
-    module import time.
-
-    Parameters
-    ----------
-    full_text : str
-        The complete text to split into chunks.
-    chunk_size : int
-        Approximate maximum size for each chunk.
-    chunk_overlap : int
-        Approximate overlap between adjacent chunks.
-
-    Returns
-    -------
-    list
-        The nodes produced by :meth:`SentenceSplitter.split_text`.
-
-    Raises
-    ------
-    ImportError
-        If ``llama_index`` is not installed.
-    """
+    """Split full text into sentence-based nodes."""
     global SentenceSplitter
     if SentenceSplitter is None:
         try:
-            from llama_index.core.node_parser import SentenceSplitter as ImportedSentenceSplitter
+            from llama_index.core.node_parser import (
+                SentenceSplitter as ImportedSentenceSplitter,
+            )
+
             SentenceSplitter = ImportedSentenceSplitter
         except ImportError as exc:
             raise ImportError(
@@ -85,24 +64,7 @@ def sentence_splitter(full_text, chunk_size, chunk_overlap):
 
 
 def chunk_text(documents, settings):
-    """Join document texts and split them into nodes using ``settings``.
-
-    The function concatenates the ``.text`` attribute from each document with
-    a newline separator and delegates to :func:`sentence_splitter` using
-    values from the provided ``settings`` dataclass.
-
-    Parameters
-    ----------
-    documents : iterable
-        Iterable of objects that expose a ``.text`` attribute.
-    settings : ChunkingConfig or ChunkingSentenceConfig
-        Chunking configuration containing ``chunk_size`` and ``chunk_overlap``.
-
-    Returns
-    -------
-    list
-        The nodes produced by :func:`sentence_splitter`.
-    """
+    """Join document texts and split them into nodes."""
 
     full_text = "\n".join(doc.text for doc in documents)
     nodes = sentence_splitter(full_text, settings.chunk_size, settings.chunk_overlap)

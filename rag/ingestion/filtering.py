@@ -37,12 +37,7 @@ class Margin:
 
 
 def clean_text(text: str) -> str:
-    """Normalize page text.
-
-    - Replace non-breaking spaces and tabs
-    - Remove hyphen-newline splits
-    - Collapse multiple spaces
-    """
+    """Normalize page text."""
     text = (text or "").replace("\xa0", " ")
     text = text.replace("\t", " ")
     text = re.sub(r"-\n", "", text)
@@ -64,11 +59,7 @@ def is_bad_page(text: str) -> bool:
 
 
 def extract_header(page, header_height: int = 40) -> str:
-    """Extract header text from a page-like object and return it lower-cased.
-
-    The page is expected to expose a .rect attribute and a get_text(kind, clip=...) method
-    compatible with PyMuPDF. Test fakes may be simpler and only implement get_text(kind).
-    """
+    """Extract header text from a page-like object."""
     rect = getattr(page, "rect", None)
     if rect is None:
         try:
@@ -92,13 +83,7 @@ def extract_header(page, header_height: int = 40) -> str:
 
 
 def extract_section_name(page, special_sections: Optional[Iterable[str]] = None) -> str:
-    """Determine a coarse section label for a page.
-
-    Heuristic:
-    1. Look for names in the header.
-    2. If header is empty, search full page text.
-    3. Return 'structural' if only structural markers are found, otherwise 'body'.
-    """
+    """Determine a coarse section label for a page."""
     special_sections = list(special_sections or SPECIAL_SECTIONS)
     header = extract_header(page)
     for section_name in special_sections:

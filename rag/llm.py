@@ -10,18 +10,7 @@ from typing import Any
 
 
 def load_openai_client(api_key=None):
-    """Instantiate an OpenAI client wrapper.
-
-    Parameters
-    ----------
-    api_key : str, optional
-        API key used to initialize the client.
-
-    Returns
-    -------
-    object
-        An OpenAI client instance.
-    """
+    """Instantiate an OpenAI client wrapper."""
     try:
         from openai import OpenAI
     except ImportError as exc:
@@ -39,24 +28,7 @@ def generate_answer(
     model_name: str = "gpt-4.1-mini",
     temperature: float = 1.0,
 ) -> str:
-    """Generate an answer from the provided client using a prompt.
-
-    Parameters
-    ----------
-    client : object
-        The model client exposing chat.completions.create(...).
-    prompt : str
-        The prompt text to send to the model.
-    model_name : str, optional
-        The model identifier to use.
-    temperature : float, optional
-        Sampling temperature.
-
-    Returns
-    -------
-    str
-        Text content of the first choice returned by the model.
-    """
+    """Generate an answer from the provided client."""
     response = client.chat.completions.create(
         model=model_name,
         messages=[{"role": "user", "content": prompt}],
@@ -67,14 +39,7 @@ def generate_answer(
 
 
 def normalize_answer(text: str) -> str:
-    """Normalize generated answers for QA-style evaluation.
-
-    The goal is to make answers more concise and comparable to the ground-truth
-    dataset. The function strips surrounding whitespace, removes common leading
-    phrases such as "The answer is" or "It is", and collapses repeated
-    whitespace. It keeps the content mostly intact while making the output more
-    extractive and less verbose.
-    """
+    """Normalize generated answers for QA-style evaluation."""
     if not text:
         return ""
 
@@ -82,9 +47,15 @@ def normalize_answer(text: str) -> str:
     cleaned = cleaned.replace("\n", " ")
     cleaned = " ".join(cleaned.split())
 
-    for prefix in ["Answer:", "The answer is", "It is", "The thesis is", "The main contribution is"]:
+    for prefix in [
+        "Answer:",
+        "The answer is",
+        "It is",
+        "The thesis is",
+        "The main contribution is",
+    ]:
         if cleaned.lower().startswith(prefix.lower()):
-            cleaned = cleaned[len(prefix):].strip()
+            cleaned = cleaned[len(prefix) :].strip()
             break
 
     if cleaned.lower().startswith("not found"):

@@ -41,14 +41,14 @@ def test_retrieve_top_k_WHEN_index_matches_chunks_THEN_formats_results():
     assert results[1]["doc_id"] == "UNKNOWN"
 
 
-def test_retrieve_top_k_WHEN_special_section_is_ranked_THEN_demotes_it():
+def test_retrieve_top_k_WHEN_section_label_matches_query_THEN_gives_small_boost():
     chunks = [
         {
             "id": "special",
-            "text": "propositions",
+            "text": "list of publications",
             "page": 2,
             "doc_id": "d0",
-            "metadata": {"section": "propositions"},
+            "metadata": {"section": "list of publications"},
         },
         {
             "id": "body",
@@ -59,11 +59,11 @@ def test_retrieve_top_k_WHEN_special_section_is_ranked_THEN_demotes_it():
         },
     ]
 
-    idx = FakeIndex([[0.8, 0.9]], [[0, 1]])
+    idx = FakeIndex([[0.9, 0.89]], [[0, 1]])
     embedder = FakeEmbedder()
 
     results = retrieve_top_k(
-        "What is the main contribution?",
+        "What publications resulted from this PhD work?",
         chunks,
         embedder,
         idx,
@@ -71,9 +71,43 @@ def test_retrieve_top_k_WHEN_special_section_is_ranked_THEN_demotes_it():
         use_metadata_reranking=True,
     )
 
-    assert results[0]["id"] == "body"
-    assert results[0]["section"] == "body"
-    assert results[1]["id"] == "special"
+    assert results[0]["id"] == "special"
+    assert results[0]["section"] == "list of publications"
+    assert results[1]["id"] == "body"
+
+
+def test_retrieve_top_k_WHEN_chunk_text_matches_query_THEN_gives_small_boost():
+    chunks = [
+        {
+            "id": "publications",
+            "text": "This page lists publications from the thesis.",
+            "page": 2,
+            "doc_id": "d0",
+            "metadata": {"section": "body"},
+        },
+        {
+            "id": "body",
+            "text": "Main body content",
+            "page": 3,
+            "doc_id": "d0",
+            "metadata": {"section": "body"},
+        },
+    ]
+
+    idx = FakeIndex([[0.9, 0.89]], [[0, 1]])
+    embedder = FakeEmbedder()
+
+    results = retrieve_top_k(
+        "What publications resulted from this PhD work?",
+        chunks,
+        embedder,
+        idx,
+        k=2,
+        use_metadata_reranking=True,
+    )
+
+    assert results[0]["id"] == "publications"
+    assert results[1]["id"] == "body"
 
 
 def test_retrieve_top_k_WHEN_reranking_is_disabled_THEN_preserves_faiss_order():

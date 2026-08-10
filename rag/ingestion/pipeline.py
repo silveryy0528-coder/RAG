@@ -42,11 +42,7 @@ class Chunk:
 
 
 def group_pages_by_section(pages: Iterable[Any]) -> Dict[str, List[Any]]:
-    """Group a sequence of page-like objects by their ``metadata['section']``.
-
-    Returns a dict mapping section name -> list[page]. Pages lacking metadata
-    are grouped under the ``None`` key.
-    """
+    """Group pages by section."""
     sections: Dict[str, List[Any]] = {}
     for page in pages:
         meta = getattr(page, "metadata", {})
@@ -74,23 +70,7 @@ def chunk_single_document(
     options: Optional[IngestOptions] = None,
     chunk_id_offset: int = 0,
 ) -> List[Chunk]:
-    """Read a PDF and produce chunks for a single document.
-
-    Parameters
-    ----------
-    pdf_file : str
-        Path to the PDF file.
-    options : IngestOptions, optional
-        Optional parameters including chunk_settings, fitz_module,
-        document_factory and chunk_text_fn. Use this to inject test doubles.
-    chunk_id_offset : int, optional
-        Base ID to assign to produced chunks.
-
-    Returns
-    -------
-    list[Chunk]
-        Generated chunks for the document.
-    """
+    """Read a PDF and produce chunks for a single document."""
     options = options or IngestOptions()
 
     # Resolve chunk_text function and default settings. Prefer an injected
@@ -99,6 +79,7 @@ def chunk_single_document(
     chunk_text_fn = options.chunk_text_fn or _chunk_text
     chunk_settings = options.chunk_settings
     if chunk_text_fn is None:
+
         def _fallback_chunk_text(pages, _settings=None):
             return ["\n".join(getattr(p, "text", "") for p in pages)]
 
@@ -108,7 +89,11 @@ def chunk_single_document(
             chunk_settings = ChunkingSentenceConfig()
 
     # Read pages (pdf_io handles fitz injection)
-    pages = read_pdf_file(pdf_file, fitz_module=options.fitz_module, document_factory=options.document_factory)
+    pages = read_pdf_file(
+        pdf_file,
+        fitz_module=options.fitz_module,
+        document_factory=options.document_factory,
+    )
     if not pages:
         return []
 
@@ -120,11 +105,23 @@ def chunk_single_document(
     all_chunks: List[Chunk] = []
     chunk_id = chunk_id_offset
     for section_name, section_pages in sections.items():
-        logger.info("Processing %s - Section: %s with %d pages", doc_id, section_name, len(section_pages))
+        logger.info(
+            "Processing %s - Section: %s with %d pages",
+            doc_id,
+            section_name,
+            len(section_pages),
+        )
         nodes = chunk_text_fn(section_pages, chunk_settings)
         for node in nodes:
             node_text = clean_text(node)
-            chunk = Chunk(text=node_text, metadata={"section": section_name, "doc_id": doc_id, "chunk_id": chunk_id})
+            chunk = Chunk(
+                text=node_text,
+                metadata={
+                    "section": section_name,
+                    "doc_id": doc_id,
+                    "chunk_id": chunk_id,
+                },
+            )
             chunk_id += 1
             all_chunks.append(chunk)
 
@@ -135,20 +132,14 @@ def chunk_multiple_documents(
     pdf_files: Iterable[str],
     options: Optional[IngestOptions] = None,
 ) -> List[Chunk]:
-    """Process multiple PDF files and concatenate produced chunks.
-
-    Parameters
-    ----------
-    pdf_files : iterable
-        Paths to PDF files to process.
-    options : IngestOptions, optional
-        Shared options passed to each single-document call.
-    """
+    """Process multiple PDF files and concatenate produced chunks."""
     all_chunks: List[Chunk] = []
     id_offset = 0
 
     for pdf_file in pdf_files:
-        chunks = chunk_single_document(pdf_file, options=options, chunk_id_offset=id_offset)
+        chunks = chunk_single_document(
+            pdf_file, options=options, chunk_id_offset=id_offset
+        )
         id_offset += len(chunks)
         all_chunks.extend(chunks)
 

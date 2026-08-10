@@ -8,8 +8,6 @@ import re
 from typing import List, Dict, Any
 
 from rag.embedding import embed_text
-from rag.ingestion.filtering import SPECIAL_SECTIONS
-
 
 _STOPWORDS = {
     "a",
@@ -43,6 +41,7 @@ _STOPWORDS = {
 
 
 def _extract_query_terms(question: str) -> set[str]:
+    """Return normalized non-stopword terms from a question."""
     return {
         token
         for token in re.findall(r"[a-z0-9]+", (question or "").lower())
@@ -50,12 +49,22 @@ def _extract_query_terms(question: str) -> set[str]:
     }
 
 
-def _chunk_to_result(
-    chunk: Any,
-    score: float,
-    question: str,
-    use_metadata_reranking: bool = False,
-) -> Dict[str, Any]:
+def _normalize_token(token: str) -> str:
+    """Normalize a token for coarse singular/plural matching."""
+    normalized = re.sub(r"[^a-z0-9]+", "", (token or "").lower())
+    if not normalized:
+        return ""
+    if normalized.endswith("ies") and len(normalized) > 4:
+        return normalized[:-3] + "y"
+    if normalized.endswith("es") and len(normalized) > 4:
+        return normalized[:-2]
+    if normalized.endswith("s") and len(normalized) > 3:
+        return normalized[:-1]
+    return normalized
+
+
+def _chunk_fields(chunk: Any) -> Dict[str, Any]:
+    """Extract the fields the retriever needs from a chunk object."""
     if isinstance(chunk, dict):
         text = chunk.get("text")
         metadata = chunk.get("metadata") or {}
@@ -71,45 +80,121 @@ def _chunk_to_result(
         page = metadata.get("page")
         section = metadata.get("section")
 
-    metadata_boost = _metadata_boost(question, section) if use_metadata_reranking else 0.0
+    return {
+        "text": text,
+        "metadata": metadata,
+        "chunk_id": chunk_id,
+        "doc_id": doc_id,
+        "page": page,
+        "section": section,
+    }
+
+
+def _chunk_to_result(
+    chunk: Any,
+    score: float,
+    question: str,
+    use_metadata_reranking: bool = False,
+) -> Dict[str, Any]:
+    """Convert a chunk into the public retrieval result shape."""
+    fields = _chunk_fields(chunk)
+    text = fields["text"]
+    metadata = fields["metadata"]
+    chunk_id = fields["chunk_id"]
+    doc_id = fields["doc_id"]
+    page = fields["page"]
+    section = fields["section"]
+
+    metadata_boost = (
+        _metadata_boost(question, section, text) if use_metadata_reranking else 0.0
+    )
     result = {
         "id": chunk_id,
         "text": text,
         "doc_id": doc_id,
-        "score": float(score) + metadata_boost,
         "page": page,
+        "score": float(score) + metadata_boost,
         "section": section,
         "metadata": metadata,
     }
     return result
 
 
-def _metadata_boost(question: str, section: str | None) -> float:
-    if not section:
-        return 0.0
-
-    section_name = str(section).strip().lower()
+def _metadata_boost(question: str, section: str | None, text: str | None) -> float:
+    """Compute a small score bonus for direct query overlap."""
     query_terms = _extract_query_terms(question)
     if not query_terms:
         return 0.0
 
-    if section_name in {"structural", "body"}:
-        return 0.0
+    normalized_query_terms = {_normalize_token(term) for term in query_terms}
 
-    if section_name in {"summary", "acknowledgements", "about the author", "samenvatting", "stellingen", "copyright", "references"}:
-        if any(term in section_name for term in query_terms):
+    if section:
+        section_name = str(section).strip().lower()
+        if section_name not in {"structural", "body"}:
+            normalized_section_tokens = {
+                _normalize_token(token)
+                for token in re.findall(r"[a-z0-9]+", section_name)
+            }
+            explicit_section_matches = [
+                term
+                for term in normalized_query_terms
+                if term and term in normalized_section_tokens
+            ]
+            if explicit_section_matches:
+                return 0.04
+
+    if text:
+        normalized_text_tokens = {
+            _normalize_token(token)
+            for token in re.findall(r"[a-z0-9]+", (text or "").lower())
+        }
+        explicit_text_matches = [
+            term
+            for term in normalized_query_terms
+            if term and term in normalized_text_tokens
+        ]
+        if explicit_text_matches:
             return 0.02
-        return -0.03
-
-    if section_name in SPECIAL_SECTIONS:
-        if any(term in section_name for term in query_terms):
-            return 0.03
-        return -0.02
-
-    if any(term in section_name for term in query_terms):
-        return 0.03
 
     return 0.0
+
+
+def _intent_match_candidates(
+    question: str, chunks: List[Dict[str, Any]]
+) -> List[tuple[int, Dict[str, Any]]]:
+    """Find chunks that explicitly match the query intent."""
+    query_terms = _extract_query_terms(question)
+    normalized_query_terms = {_normalize_token(term) for term in query_terms}
+    if not normalized_query_terms:
+        return []
+
+    intent_terms = set(normalized_query_terms)
+    if "publication" in normalized_query_terms or "publicat" in normalized_query_terms:
+        intent_terms = {"publication", "publications", "publicat"}
+    elif "title" in normalized_query_terms or "thesis" in normalized_query_terms:
+        intent_terms = {"title", "thesis", "dissertation", "proefschrift"}
+
+    candidates: List[tuple[int, Dict[str, Any]]] = []
+    for index, chunk in enumerate(chunks):
+        fields = _chunk_fields(chunk)
+        text = fields["text"] or ""
+        section = fields["section"] or ""
+        normalized_section_tokens = {
+            _normalize_token(token)
+            for token in re.findall(r"[a-z0-9]+", str(section).lower())
+        }
+        normalized_text_tokens = {
+            _normalize_token(token)
+            for token in re.findall(r"[a-z0-9]+", (text or "").lower())
+        }
+        if any(
+            term
+            for term in intent_terms
+            if term and term in normalized_section_tokens | normalized_text_tokens
+        ):
+            candidates.append((index, chunk))
+
+    return candidates
 
 
 def retrieve_top_k(
@@ -121,54 +206,42 @@ def retrieve_top_k(
     candidate_multiplier: int = 3,
     use_metadata_reranking: bool = False,
 ) -> List[Dict[str, Any]]:
-    """Retrieve top-k matching chunks for a question.
-
-    Parameters
-    ----------
-    question : str
-        Query string to embed and search for.
-    chunks : list of dict
-        List of chunk dictionaries. Each chunk is expected to contain at least
-        ``id``, ``text`` and ``page`` keys. ``doc_id`` is optional.
-    embedder : object
-        Embedder object exposing an ``encode`` method compatible with
-        ``sentence_transformers.SentenceTransformer``.
-    faiss_index : object
-        FAISS index instance exposing a ``search(query_vec, k)`` method.
-    k : int, optional
-        Number of top results to return. Default is 3.
-    candidate_multiplier : int, optional
-        How many candidates to collect before reranking. A larger value gives the
-        metadata-based reranker more room to recover better matches.
-    use_metadata_reranking : bool, optional
-        If True, rerank the retrieved candidates using section metadata. The
-        default is False so the original semantic similarity ordering is preserved
-        unless explicitly enabled.
-
-    Returns
-    -------
-    list of dict
-        A list of result dictionaries containing keys ``id``, ``text``,
-        ``doc_id``, ``score``, ``page`` and ``section``.
-    """
+    """Retrieve top-k matching chunks for a question."""
     query_vec = embed_text(embedder, texts=[question])
     search_k = max(k * candidate_multiplier, k)
+    if use_metadata_reranking:
+        search_k = max(search_k, k * 8)
     scores, indices = retrieve_top_k_raw(query_vec, faiss_index, search_k)
 
     results = []
+    seen_indices = set()
+    if use_metadata_reranking:
+        intent_matches = _intent_match_candidates(question, chunks)
+        for chunk_index, chunk in intent_matches[: max(k * 2, k)]:
+            result = _chunk_to_result(
+                chunk, 0.0, question, use_metadata_reranking=False
+            )
+            result["score"] += 3.0
+            if chunk_index in seen_indices:
+                continue
+            seen_indices.add(chunk_index)
+            results.append(result)
+
     for score, idx in zip(scores[0], indices[0]):
         # Guard against invalid indices (e.g., -1)
         if idx < 0 or idx >= len(chunks):
             continue
         chunk = chunks[idx]
-        results.append(
-            _chunk_to_result(
-                chunk,
-                score,
-                question,
-                use_metadata_reranking=use_metadata_reranking,
-            )
+        result = _chunk_to_result(
+            chunk,
+            score,
+            question,
+            use_metadata_reranking=use_metadata_reranking,
         )
+        if idx in seen_indices:
+            continue
+        seen_indices.add(idx)
+        results.append(result)
 
     if use_metadata_reranking:
         ranked_results = sorted(results, key=lambda item: item["score"], reverse=True)
@@ -178,20 +251,5 @@ def retrieve_top_k(
 
 
 def retrieve_top_k_raw(query_vec, faiss_index, k: int = 3):
-    """Search FAISS index using a precomputed query vector.
-
-    Parameters
-    ----------
-    query_vec : numpy.ndarray
-        Query vector or a batch of query vectors shaped (1, D).
-    faiss_index : object
-        FAISS index exposing a ``search`` method.
-    k : int, optional
-        Number of nearest neighbors to return.
-
-    Returns
-    -------
-    tuple
-        (scores, indices) returned by the index's search method.
-    """
+    """Search FAISS with a precomputed query vector."""
     return faiss_index.search(query_vec, k)

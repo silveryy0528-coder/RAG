@@ -8,7 +8,13 @@ from dataclasses import dataclass
 from typing import Any, Callable, Iterable, List, Optional
 import os
 
-from .filtering import clean_text, is_bad_page, extract_section_name, Margin, EXCLUDED_SECTIONS
+from .filtering import (
+    clean_text,
+    is_bad_page,
+    extract_section_name,
+    Margin,
+    EXCLUDED_SECTIONS,
+)
 
 
 @dataclass
@@ -28,18 +34,16 @@ def read_pdf_file(
     excluded_sections: Optional[Iterable[str]] = None,
     document_factory: Callable[[str, dict], Any] = None,
 ) -> List[Any]:
-    """Open a PDF and return per-page document objects.
-
-    This function lazily imports the provided fitz_module (PyMuPDF) if none is
-    given. For unit tests, pass a fake fitz_module that exposes open(), Rect
-    and page-like objects with get_text() and rect.
-    """
+    """Open a PDF and return per-page document objects."""
     if fitz_module is None:
         try:
             import fitz as _fitz  # type: ignore
+
             fitz_module = _fitz
         except Exception as exc:  # pragma: no cover - environment specific
-            raise ImportError("fitz (PyMuPDF) is required for read_pdf_file unless a fitz_module is provided") from exc
+            raise ImportError(
+                "fitz (PyMuPDF) is required for read_pdf_file unless a fitz_module is provided"
+            ) from exc
 
     if document_factory is None:
         document_factory = _default_document_factory

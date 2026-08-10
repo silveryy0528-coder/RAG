@@ -66,9 +66,7 @@ def _build_faiss_ivf(embeddings: Any, dim: int, nlist: int):
     return index
 
 
-def _build_faiss_ivfpq(
-    embeddings: Any, dim: int, nlist: int, m: int, nbits: int
-):
+def _build_faiss_ivfpq(embeddings: Any, dim: int, nlist: int, m: int, nbits: int):
     import faiss
 
     quantizer = faiss.IndexFlatL2(dim)
@@ -79,27 +77,7 @@ def _build_faiss_ivfpq(
 
 
 def build_faiss_index(embeddings: Any, settings: FaissConfig):
-    """Build and populate a FAISS index according to ``settings``.
-
-    Parameters
-    ----------
-    embeddings : numpy.ndarray
-        2-D array of shape (N, D) containing the float32 embeddings.
-    settings : FaissConfig
-        One of the config dataclasses defined in this module.
-
-    Returns
-    -------
-    faiss.Index
-        A FAISS index instance populated with the provided embeddings.
-
-    Raises
-    ------
-    TypeError
-        If ``settings`` is not a FaissConfig instance.
-    ValueError
-        If ``embeddings`` is not a 2-D numpy array.
-    """
+    """Build and populate a FAISS index."""
     if not isinstance(settings, FaissConfig):
         raise TypeError("Wrong FAISS settings provided.")
 

@@ -13,25 +13,7 @@ from rag.prompting import build_evaluation_prompt, build_relevance_prompt
 
 
 def compute_grounding_score(answer: str, context: str) -> float:
-    """Compute a simple grounding score based on token overlap.
-
-    The grounding score is the fraction of tokens in ``answer`` that also
-    appear in ``context``. Tokens are extracted using ``w+`` and compared
-    case-insensitively.
-
-    Parameters
-    ----------
-    answer : str
-        Candidate answer text.
-    context : str
-        Context text presumed to contain supporting evidence.
-
-    Returns
-    -------
-    float
-        A value between 0 and 1 representing the fraction of answer tokens
-        present in the context. Returns 0 if the answer contains no tokens.
-    """
+    """Compute a simple grounding score based on token overlap."""
     answer_tokens = re.findall(r"\w+", (answer or "").lower())
     context_tokens = set(re.findall(r"\w+", (context or "").lower()))
 
@@ -50,28 +32,7 @@ def evaluate_answer_with_llm(
     model_name: str = "gpt-4.1-mini",
     temperature: float = 0.0,
 ) -> str:
-    """Ask an LLM to evaluate whether an answer is supported by context.
-
-    Parameters
-    ----------
-    client : object
-        Model client exposing chat.completions.create(...).
-    question : str
-        Original user question.
-    answer : str
-        Candidate answer produced by the QA system.
-    context : str
-        Context used to source the answer.
-    model_name : str, optional
-        Model identifier to use.
-    temperature : float, optional
-        Sampling temperature for the model.
-
-    Returns
-    -------
-    str
-        The raw model response.
-    """
+    """Ask an LLM whether an answer is supported by context."""
     prompt = build_evaluation_prompt(question, answer, context)
     return generate_answer(client, prompt, model_name, temperature)
 
@@ -83,25 +44,6 @@ def evaluate_chunk_relevance_with_llm(
     model_name: str = "gpt-4.1-mini",
     temperature: float = 0.0,
 ) -> str:
-    """Ask an LLM whether a retrieved chunk is relevant to a question.
-
-    Parameters
-    ----------
-    client : object
-        Model client exposing chat.completions.create(...).
-    question : str
-        User question.
-    chunk : str
-        Text of the retrieved chunk.
-    model_name : str, optional
-        Model identifier to use.
-    temperature : float, optional
-        Sampling temperature for the model.
-
-    Returns
-    -------
-    str
-        The raw model response.
-    """
+    """Ask an LLM whether a retrieved chunk is relevant."""
     prompt = build_relevance_prompt(question, chunk)
     return generate_answer(client, prompt, model_name, temperature)

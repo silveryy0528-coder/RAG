@@ -3,6 +3,7 @@
 Includes helpers to display retrieved chunks, evaluate generated answers using
 existing evaluating.* helpers, and to save a structured JSON result file.
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -14,11 +15,7 @@ from rag.runtime_evaluation import compute_grounding_score, evaluate_answer_with
 
 
 def build_context_from_results(results: Sequence[Dict[str, Any]]) -> str:
-    """Format retrieved results as a single context block.
-
-    The helper adds lightweight metadata headers so downstream prompts and
-    debugging output can trace where each piece of context came from.
-    """
+    """Format retrieved results as a single context block."""
     parts: List[str] = []
     for i, result in enumerate(results, start=1):
         text = result.get("text") or result.get("content") or ""
@@ -37,14 +34,7 @@ def build_context_from_results(results: Sequence[Dict[str, Any]]) -> str:
 
 
 def show_top_k_results(results: List[Dict[str, Any]]) -> None:
-    """Print the retrieved top-k chunks with metadata and scores.
-
-    Parameters
-    ----------
-    results : list[dict]
-        Retrieval results as returned by the search step. Each item should
-        contain at least 'text', 'score', and optional 'doc_id'/'page'.
-    """
+    """Print the retrieved top-k chunks."""
     print("\n--- Top retrieved chunks ---\n")
     for i, r in enumerate(results, start=1):
         doc = r.get("doc_id", "UNKNOWN")
@@ -65,11 +55,7 @@ def evaluate_generated_answer(
     model_name: str,
     temperature: float = 0.0,
 ) -> Dict[str, Any]:
-    """Evaluate the generated answer using the LLM evaluator and grounding score.
-
-    Returns a dictionary containing the grounding score and the raw LLM
-    evaluation response.
-    """
+    """Evaluate a generated answer."""
     context = "\n\n".join(
         (f"[chunk {i+1}]\n" + (r.get("text") or "")) for i, r in enumerate(results)
     )
@@ -99,12 +85,7 @@ def save_results_json(
     out_dir: Path,
     prefix: str = "query",
 ) -> Path:
-    """Save a structured JSON file containing retrievals, answer and evaluation.
-
-    The function creates out_dir if necessary and writes a timestamped file.
-
-    Returns the path to the written file.
-    """
+    """Save retrievals, answer, and evaluation to JSON."""
     out_dir = out_dir.expanduser()
     out_dir.mkdir(parents=True, exist_ok=True)
 

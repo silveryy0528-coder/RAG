@@ -13,7 +13,11 @@ from .filtering import (
     EXCLUDED_SECTIONS,
     Margin,
 )  # noqa: F401
-from .pipeline import chunk_single_document, chunk_multiple_documents, Chunk  # noqa: F401
+from .pipeline import (
+    chunk_single_document,
+    chunk_multiple_documents,
+    Chunk,
+)  # noqa: F401
 
 __all__ = [
     "read_pdf_file",
