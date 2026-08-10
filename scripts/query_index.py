@@ -21,7 +21,6 @@ from pathlib import Path
 from typing import List
 
 import faiss
-import numpy as np
 
 from rag.embedding import load_embedder
 from rag.retriever import retrieve_top_k
@@ -66,6 +65,8 @@ def build_context_from_results(results: List[dict]) -> str:
             meta.append(f"doc:{r.get('doc_id')}")
         if r.get("page"):
             meta.append(f"page:{r.get('page')}")
+        if r.get("section"):
+            meta.append(f"section:{r.get('section')}")
         header = f"[chunk {i} {'|'.join(meta)}]" if meta else f"[chunk {i}]"
         parts.append(header + "\n" + text)
     return "\n\n".join(parts)
@@ -93,35 +94,7 @@ def run(
     # Prepare embedder and client
     embedder = load_embedder(device=device)
 
-    # Embed the question and normalize the vector to match index preprocessing
-    q_vec = embedder.encode([question], device=device, convert_to_numpy=True, normalize_embeddings=False)
-    # If the index was built with normalized vectors (as in build_index.py) we must
-    # normalize the query vector before searching to get cosine-like behavior.
-    try:
-        faiss.normalize_L2(q_vec)
-    except Exception:
-        # If faiss normalization fails for any reason, continue with raw vector
-        pass
-
-    # Search the index
-    scores, indices = index.search(q_vec, k)
-
-    # Map search results to chunk dicts (similar to rag.retriever.retrieve_top_k)
-    results = []
-    for score_row, idx_row in zip(scores, indices):
-        for score, idx in zip(score_row, idx_row):
-            if idx < 0 or idx >= len(chunks):
-                continue
-            chunk = chunks[idx]
-            results.append(
-                {
-                    "id": getattr(chunk, "metadata", {}).get("chunk_id") if hasattr(chunk, "metadata") else getattr(chunk, "id", None),
-                    "text": getattr(chunk, "text", None) or chunk.get("text") if isinstance(chunk, dict) else getattr(chunk, "text", ""),
-                    "doc_id": getattr(chunk, "metadata", {}).get("doc_id") if hasattr(chunk, "metadata") else chunk.get("doc_id", "UNKNOWN"),
-                    "score": float(score),
-                    "page": getattr(chunk, "metadata", {}).get("page") if hasattr(chunk, "metadata") else chunk.get("page"),
-                }
-            )
+    results = retrieve_top_k(question, chunks, embedder, index, k=k)
 
     if not results:
         raise RuntimeError("No retrieval results — check that index and chunks match")

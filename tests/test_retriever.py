@@ -41,6 +41,34 @@ def test_retrieve_top_k_WHEN_index_matches_chunks_THEN_formats_results():
     assert results[1]["doc_id"] == "UNKNOWN"
 
 
+def test_retrieve_top_k_WHEN_special_section_is_ranked_THEN_demotes_it():
+    chunks = [
+        {
+            "id": "special",
+            "text": "propositions",
+            "page": 2,
+            "doc_id": "d0",
+            "metadata": {"section": "propositions"},
+        },
+        {
+            "id": "body",
+            "text": "main body",
+            "page": 3,
+            "doc_id": "d0",
+            "metadata": {"section": "body"},
+        },
+    ]
+
+    idx = FakeIndex([[0.9, 0.8]], [[0, 1]])
+    embedder = FakeEmbedder()
+
+    results = retrieve_top_k("What is the main contribution?", chunks, embedder, idx, k=2)
+
+    assert results[0]["id"] == "body"
+    assert results[0]["section"] == "body"
+    assert results[1]["id"] == "special"
+
+
 def test_retrieve_top_k_raw_WHEN_called_THEN_returns_search_output():
     idx = FakeIndex([[0.1]], [[2]])
     query_vec = [[0.2, 0.3]]

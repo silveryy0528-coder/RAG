@@ -62,4 +62,32 @@ def generate_answer(
         messages=[{"role": "user", "content": prompt}],
         temperature=temperature,
     )
-    return response.choices[0].message.content
+    content = response.choices[0].message.content
+    return normalize_answer(content)
+
+
+def normalize_answer(text: str) -> str:
+    """Normalize generated answers for QA-style evaluation.
+
+    The goal is to make answers more concise and comparable to the ground-truth
+    dataset. The function strips surrounding whitespace, removes common leading
+    phrases such as "The answer is" or "It is", and collapses repeated
+    whitespace. It keeps the content mostly intact while making the output more
+    extractive and less verbose.
+    """
+    if not text:
+        return ""
+
+    cleaned = text.strip()
+    cleaned = cleaned.replace("\n", " ")
+    cleaned = " ".join(cleaned.split())
+
+    for prefix in ["Answer:", "The answer is", "It is", "The thesis is", "The main contribution is"]:
+        if cleaned.lower().startswith(prefix.lower()):
+            cleaned = cleaned[len(prefix):].strip()
+            break
+
+    if cleaned.lower().startswith("not found"):
+        return "Not found"
+
+    return cleaned

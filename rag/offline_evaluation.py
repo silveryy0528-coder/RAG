@@ -162,11 +162,14 @@ def is_not_found(text: str) -> bool:
 
 def _chunk_to_dict(chunk: Any) -> Dict[str, Any]:
     if isinstance(chunk, dict):
+        metadata = chunk.get("metadata") or {}
         return {
             "id": chunk.get("id"),
             "text": chunk.get("text", ""),
-            "doc_id": chunk.get("doc_id", "UNKNOWN"),
-            "page": chunk.get("page"),
+            "doc_id": chunk.get("doc_id", metadata.get("doc_id", "UNKNOWN")),
+            "page": chunk.get("page", metadata.get("page")),
+            "section": metadata.get("section"),
+            "metadata": metadata,
         }
 
     metadata = getattr(chunk, "metadata", {}) or {}
@@ -175,6 +178,8 @@ def _chunk_to_dict(chunk: Any) -> Dict[str, Any]:
         "text": getattr(chunk, "text", "") or "",
         "doc_id": metadata.get("doc_id", "UNKNOWN"),
         "page": metadata.get("page"),
+        "section": metadata.get("section"),
+        "metadata": metadata,
     }
 
 
@@ -192,12 +197,19 @@ def build_context_from_results(results: Sequence[Dict[str, Any]]) -> str:
     """Concatenate retrieved results into a single context string.
 
     Each retrieved chunk is prefixed with a small header that includes the
-    document id and page to aid debugging and provide traceability when the
-    context is shown or passed to an evaluator LLM.
+    document id, page and section to aid debugging and provide traceability
+    when the context is shown or passed to an evaluator LLM.
     """
     parts: List[str] = []
     for i, result in enumerate(results, start=1):
-        header = f"[chunk {i} doc={result.get('doc_id', 'UNKNOWN')} page={result.get('page', '?')}]"
+        meta = []
+        if result.get("doc_id"):
+            meta.append(f"doc={result.get('doc_id')}")
+        if result.get("page") is not None:
+            meta.append(f"page={result.get('page')}")
+        if result.get("section"):
+            meta.append(f"section={result.get('section')}")
+        header = f"[chunk {i} {'|'.join(meta)}]" if meta else f"[chunk {i}]"
         parts.append(header)
         parts.append(result.get("text", ""))
     return "\n\n".join(parts)

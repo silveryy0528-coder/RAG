@@ -26,9 +26,11 @@ def show_top_k_results(results: List[Dict[str, Any]]) -> None:
     for i, r in enumerate(results, start=1):
         doc = r.get("doc_id", "UNKNOWN")
         page = r.get("page", "?")
+        section = r.get("section") or ""
         score = r.get("score")
         text = (r.get("text") or "").strip().replace("\n", " ")
-        print(f"{i}. doc={doc} page={page} score={score:.4f}")
+        section_suffix = f" section={section}" if section else ""
+        print(f"{i}. doc={doc} page={page}{section_suffix} score={score:.4f}")
         print(f"   {text[:400]}\n")
 
 
