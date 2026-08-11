@@ -14,6 +14,10 @@ def resolve_project_root() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
+def default_offline_results_dir(project_root: Path) -> Path:
+    return project_root / "results" / "offline_evaluation"
+
+
 def parse_args() -> argparse.Namespace:
     project_root = resolve_project_root()
     default_dataset = project_root / "data" / "evaluation" / "qa_dataset.json"
@@ -71,7 +75,7 @@ def parse_args() -> argparse.Namespace:
         "--output-json",
         type=Path,
         default=None,
-        help="Path to save the evaluation report as JSON. (Path)",
+        help="Path to save the evaluation report as JSON (defaults to results/offline_evaluation/). (Path)",
     )
     parser.add_argument(
         "--debug-failures",
@@ -157,6 +161,7 @@ def main() -> None:
     if args.generate and not args.api_key:
         raise ValueError("--api-key is required when --generate is set.")
 
+    project_root = resolve_project_root()
     summary, details = run_offline_evaluation(
         dataset_path=args.dataset,
         processed_dir=args.processed_dir,
@@ -172,9 +177,9 @@ def main() -> None:
     print_summary(summary)
     print_debug_examples(details, args.debug_failures)
 
-    # Save detailed results to a timestamped file inside results/ by default
+    # Save detailed results to a timestamped file inside results/offline_evaluation/.
     if args.output_json is None:
-        results_dir = Path("results")
+        results_dir = default_offline_results_dir(project_root)
         results_dir.mkdir(parents=True, exist_ok=True)
         output_path = results_dir / f"offline_evaluation-{__import__('datetime').datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}.json"
     else:

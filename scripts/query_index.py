@@ -43,6 +43,10 @@ def resolve_project_root() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
+def default_query_results_dir(project_root: Path) -> Path:
+    return project_root / "results" / "query"
+
+
 def load_chunks(processed_dir: Path) -> List[object]:
     chunk_file = processed_dir / "chunks.pkl"
     if not chunk_file.exists():
@@ -169,20 +173,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--show-top-k", action="store_true", help="Print the top-k retrieved chunks. (flag)")
     parser.add_argument("--evaluate", action="store_true", help="Evaluate the generated answer using the LLM evaluator and grounding score. (flag)")
     parser.add_argument("--eval-model", type=str, default="gpt-3.5-turbo", help="Smaller/cheaper model to use for evaluation (defaults to gpt-3.5-turbo). (str)")
-    parser.add_argument("--output-json", type=Path, default=None, help="Directory or file path to save JSON results (if omitted and --evaluate is set, saves to ./results/). (Path or file)")
+    parser.add_argument("--output-json", type=Path, default=None, help="Directory or file path to save JSON results (if omitted and --evaluate is set, saves to results/query/). (Path or file)")
     parser.add_argument("--use-metadata-reranking", action="store_true", help="Rerank the retrieved chunks using section metadata. (flag)")
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+    project_root = resolve_project_root()
     question = args.question
     if not question:
         question = input("Question: ")
 
     output_json = args.output_json
     if output_json is None and args.evaluate:
-        output_json = Path("results")
+        output_json = default_query_results_dir(project_root)
 
     answer, evaluation_result = run(
         question=question,
