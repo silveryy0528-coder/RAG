@@ -62,8 +62,16 @@ Then type one question at a time. Use `exit` or `quit` to stop.
 ### 3. Run a single query
 
 ```bash
-python -m scripts.rag_chat "What is the title of the thesis?" --processed-dir data/processed
+python -m scripts.rag_chat --question "What is the title of the thesis?" --processed-dir data/processed
 ```
+
+### 3b. Run with a YAML config
+
+```bash
+rag-chat --config configs/rag_chat.yaml
+```
+
+CLI flags override config values when both are provided.
 
 ### 4. Evaluate a QA dataset
 

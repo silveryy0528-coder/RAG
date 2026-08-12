@@ -1,0 +1,16 @@
+# Example configuration for rag-chat.
+# Run with:
+#   rag-chat --config configs/rag_chat.yaml
+
+question: null
+processed_dir: data/processed
+k: 3
+device: cuda
+model: gpt-4.1-mini
+temperature: 0.0
+api_key: null
+show_top_k: true
+evaluate: false
+eval_model: gpt-3.5-turbo
+output_json: null
+use_metadata_reranking: true

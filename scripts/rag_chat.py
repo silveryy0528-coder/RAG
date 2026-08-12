@@ -8,8 +8,9 @@ Usage
 -----
 ::
 
-    python -m scripts.rag_chat                        # interactive loop
-    python -m scripts.rag_chat "one-shot question"    # single question then exit
+    python -m scripts.rag_chat                                  # interactive loop
+    python -m scripts.rag_chat --question "one-shot question"   # single question
+    python -m scripts.rag_chat --config configs/rag_chat.yaml   # YAML config
 
 Type ``exit`` or ``quit`` (or press Ctrl-C / Ctrl-D) to leave the loop.
 """
@@ -18,12 +19,29 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+from typing import Any
 
 from rag.engine import RAGEngine
 
 DEFAULT_K = 3
 DEFAULT_DEVICE = "cuda"
 DEFAULT_MODEL = "gpt-4.1-mini"
+BOOL_CONFIG_KEYS = {"show_top_k", "evaluate", "use_metadata_reranking"}
+PATH_CONFIG_KEYS = {"processed_dir", "output_json"}
+ALLOWED_CONFIG_KEYS = {
+    "question",
+    "processed_dir",
+    "k",
+    "device",
+    "model",
+    "temperature",
+    "api_key",
+    "show_top_k",
+    "evaluate",
+    "eval_model",
+    "output_json",
+    "use_metadata_reranking",
+}
 
 
 def resolve_project_root() -> Path:
@@ -70,18 +88,84 @@ def run(
     )
 
 
-def parse_args() -> argparse.Namespace:
+def _load_config(config_path: Path) -> dict[str, Any]:
+    """Load and validate YAML config defaults for the CLI."""
+    if not config_path.exists():
+        raise FileNotFoundError(f"Config file not found: {config_path}")
+
+    try:
+        import yaml
+    except ImportError as exc:  # pragma: no cover
+        raise RuntimeError(
+            "YAML config support requires PyYAML. Install it with `pip install pyyaml`."
+        ) from exc
+
+    with config_path.open("r", encoding="utf-8") as fh:
+        loaded = yaml.safe_load(fh)
+
+    if loaded is None:
+        return {}
+    if not isinstance(loaded, dict):
+        raise ValueError("Config file must contain a YAML mapping at the top level.")
+
+    unknown_keys = sorted(set(loaded) - ALLOWED_CONFIG_KEYS)
+    if unknown_keys:
+        raise ValueError(
+            f"Unknown config keys in {config_path}: {', '.join(unknown_keys)}"
+        )
+
+    config: dict[str, Any] = {}
+    for key, value in loaded.items():
+        if key in BOOL_CONFIG_KEYS and not isinstance(value, bool):
+            raise ValueError(f"Config key '{key}' must be a boolean.")
+        if key == "k" and not isinstance(value, int):
+            raise ValueError("Config key 'k' must be an integer.")
+        if key == "temperature" and not isinstance(value, (int, float)):
+            raise ValueError("Config key 'temperature' must be a number.")
+        if key in PATH_CONFIG_KEYS and value is not None:
+            config[key] = Path(value)
+            continue
+        config[key] = value
+    return config
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     project_root = resolve_project_root()
     default_processed = project_root / "data" / "processed"
+    pre_parser = argparse.ArgumentParser(add_help=False)
+    pre_parser.add_argument(
+        "--config",
+        type=Path,
+        default=None,
+        help=argparse.SUPPRESS,
+    )
+    pre_args, _ = pre_parser.parse_known_args(argv)
+    config_defaults: dict[str, Any] = {}
+    if pre_args.config is not None:
+        config_defaults = _load_config(pre_args.config.expanduser())
 
     parser = argparse.ArgumentParser(
         description="Interactive chat with a FAISS-backed RAG index."
     )
     parser.add_argument(
+        "--config",
+        type=Path,
+        default=None,
+        help="Path to a YAML config file with defaults for CLI options. (Path)",
+    )
+    parser.add_argument(
         "question",
         type=str,
         nargs="?",
-        help="Optional single-shot question. If omitted, start an interactive loop. (str)",
+        default=None,
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--question",
+        dest="question_flag",
+        type=str,
+        default=None,
+        help="Single-shot question to answer once and exit. Omit it to start the interactive loop. (str)",
     )
     parser.add_argument(
         "--processed-dir",
@@ -146,7 +230,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Rerank the retrieved chunks using section metadata. (flag)",
     )
-    return parser.parse_args()
+    parser.set_defaults(**config_defaults)
+    args = parser.parse_args(argv)
+    if args.question_flag is not None:
+        args.question = args.question_flag
+    return args
 
 
 def main() -> None:

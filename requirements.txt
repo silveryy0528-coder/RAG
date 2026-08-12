@@ -9,3 +9,4 @@ openai
 transformers
 huggingface-hub
 pymupdf
+pyyaml
