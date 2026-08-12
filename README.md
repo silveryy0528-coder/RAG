@@ -1,56 +1,104 @@
-﻿# RAG — simple Retrieval-Augmented Generation demo
+# RAG
 
-## Description
+A small retrieval-augmented generation project built around SentenceTransformers, FAISS, and a lightweight query pipeline.
 
-A minimal RAG example that: reads PDF files, chunks text, embeds chunks with a SentenceTransformer model, builds a normalized FAISS index, and allows querying the index to generate answers using an LLM.
+## Overview
+
+The repository does four main things:
+
+- ingest PDFs into text chunks,
+- embed chunks with a SentenceTransformer model,
+- build and query a FAISS index,
+- generate answers from retrieved context with an OpenAI-compatible client.
 
 ## Installation
 
-1. Create and activate a virtual environment (recommended):
+Recommended workflow:
 
+1. Create a virtual environment.
+
+   ```bash
    python -m venv .venv
-   .\.venv\Scripts\activate
+   . .venv/bin/activate
+   # or on Windows: .\.venv\Scripts\activate
+   ```
 
-2. Install PyTorch first (sentence-transformers needs it). Follow instructions for your OS/GPU at https://pytorch.org/get-started/locally/ (example CPU install):
+2. Install PyTorch first for the selected platform.
 
-   pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+   ```bash
+   pip install torch --index-url https://download.pytorch.org/whl/cpu
+   ```
 
-3. Install the minimal runtime dependencies:
+   See https://pytorch.org/get-started/locally/ for alternatives.
 
+3. Install runtime dependencies.
+
+   ```bash
    pip install -r requirements.txt
+   ```
 
-Note: On Windows, faiss may be tricky to install — using faiss-cpu from PyPI is recommended when available.
+4. Install the project in editable mode for packaging work.
 
-## Usage
+   ```bash
+   pip install -e .
+   ```
 
-1. Build the index from PDFs (reads data/raw and writes to data/processed):
+## Quick start
 
-   python scripts\build_index.py --raw-dir data\raw --out-dir data\processed
+### 1. Build the index
 
-2. Query the index interactively from the command line:
+```bash
+python -m scripts.build_index --raw-dir data/raw --processed-dir data/processed
+```
 
-   set OPENAI_API_KEY=your_key_here
-   python scripts\query_index.py --index-dir data\processed --question "What are the main topics of the thesis?"
+### 2. Start an interactive chat loop
+
+```bash
+python -m scripts.rag_chat --processed-dir data/processed
+```
+
+Then type one question at a time. Use `exit` or `quit` to stop.
+
+### 3. Run a single query
+
+```bash
+python -m scripts.rag_chat "What is the title of the thesis?" --processed-dir data/processed
+```
+
+### 4. Evaluate a QA dataset
+
+```bash
+python -m scripts.evaluate --dataset data/evaluation/qa_dataset.json --processed-dir data/processed
+```
 
 ## Environment variables
 
-- OPENAI_API_KEY: required to call OpenAI-compatible LLM clients.
-- HF_TOKEN: (optional) Hugging Face token to speed up model downloads and increase rate limits.
-- HF_HUB_DISABLE_SYMLINKS_WARNING: set to 1 to silence Windows symlink warnings in CI.
+- `OPENAI_API_KEY`: required for LLM generation.
+- `HF_TOKEN`: optional Hugging Face token for faster model downloads.
+- `HF_HUB_DISABLE_SYMLINKS_WARNING=1`: recommended on Windows in CI.
 
 ## Project layout
 
-- rag/: core modules (text splitting, embedding, faiss index, llm wrapper, utils)
-- scripts/: top-level scripts: build_index.py and query_index.py
-- data/raw/: put PDF files to ingest
-- data/processed/: outputs: chunks, embeddings, and faiss index
-- tests/: pytest unit tests (use stubs in tests/conftest.py so tests run without heavy deps)
+- `rag/`: core library code (embedding, retrieval, prompting, evaluation)
+- `scripts/`: top-level CLI entry points
+- `data/raw/`: raw PDF inputs
+- `data/processed/`: generated chunks/index files
+- `results/`: profiling, query, and offline evaluation outputs
+- `tests/`: pytest coverage for the library and scripts
+
+## Packaging notes
+
+The project is now installable with `pip install -e .` and exposes console commands:
+
+- `rag-chat`
+- `rag-build`
+- `rag-evaluate`
 
 ## CI notes
 
-- The GitHub Actions workflow sets HF_TOKEN and OPENAI_API_KEY via repository secrets; ensure these are configured in repository settings.
-- The workflow also caches the Hugging Face cache and pip to speed CI.
+- The GitHub Actions workflow should cache pip and Hugging Face downloads.
+- If the workflow uses a GPU image, keep the PyTorch install aligned with it.
 
 ## License
 
-This project is an educational example. No license specified.
+This project is currently provided for educational use without a dedicated license file.

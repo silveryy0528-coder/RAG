@@ -75,13 +75,13 @@ def parse_args() -> argparse.Namespace:
     default_processed = project_root / "data" / "processed"
 
     parser = argparse.ArgumentParser(
-        description="Query the FAISS index and generate a RAG answer."
+        description="Interactive chat with a FAISS-backed RAG index."
     )
     parser.add_argument(
         "question",
         type=str,
         nargs="?",
-        help="Question to ask (if omitted, read from stdin). (str)",
+        help="Optional single-shot question. If omitted, start an interactive loop. (str)",
     )
     parser.add_argument(
         "--processed-dir",
