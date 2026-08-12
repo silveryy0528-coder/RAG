@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rag"
+version = "0.0.1"
+authors = [
+    { name = "Yan Guo" }
+]
+description = "A lightweight retrieval-augmented generation project built on FAISS and SentenceTransformers."
+requires-python = ">=3.10"
+dynamic = ["dependencies"]
+
+[project.urls]
+Repository = "https://github.com/silveryy0528-coder/RAG"
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "black",
+]
+
+[project.scripts]
+rag-chat = "scripts.rag_chat:main"
+rag-build = "scripts.build_index:main"
+rag-evaluate = "scripts.evaluate:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = [
+    "rag",
+    "rag.*",
+    "scripts",
+    "scripts.*",
+]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }

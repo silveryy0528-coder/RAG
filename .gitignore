@@ -6,3 +6,4 @@ results*
 *.bak
 .vscode*
 plan*
+dist*
