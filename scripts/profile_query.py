@@ -10,7 +10,6 @@ import re
 from pathlib import Path
 import sys
 
-
 DEFAULT_QUESTION = "What is the title of the thesis"
 DEFAULT_DEVICE = "cpu"
 DEFAULT_MODEL = "gpt-4.1-mini"
@@ -19,7 +18,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-import scripts.query_index as query_index
+import scripts.rag_chat as rag_chat
+import rag.engine as rag_engine
 
 
 def resolve_project_root() -> Path:
@@ -65,6 +65,8 @@ def _fake_generate_answer(client, prompt, model_name="gpt-4.1-mini", temperature
 
 query_index.load_openai_client = _fake_load_openai_client
 query_index.generate_answer = _fake_generate_answer
+rag_engine.load_openai_client = _fake_load_openai_client
+rag_engine.generate_answer = _fake_generate_answer
 
 
 def parse_args() -> argparse.Namespace:
@@ -136,7 +138,7 @@ def main() -> None:
 
     profiler = cProfile.Profile()
     profiler.enable()
-    query_index.run(
+    rag_chat.run(
         question=args.question,
         processed_dir=args.processed_dir,
         k=args.k,
@@ -154,8 +156,45 @@ def main() -> None:
 
     profiler.dump_stats(str(profile_path))
     with report_path.open("w", encoding="utf-8") as fh:
+        # Section 1: full view, library and all, sorted by cumulative time.
         stats = pstats.Stats(profiler, stream=fh)
-        stats.strip_dirs().sort_stats("cumulative").print_stats(50)
+        stats.strip_dirs().sort_stats("cumulative")
+
+        fh.write("=" * 70 + "\n")
+        fh.write("SECTION 1 — Top 200 functions by cumulative time (full view)\n")
+        fh.write("=" * 70 + "\n\n")
+        stats.print_stats(200)
+
+        # Section 2: only our own code, by cumulative time.
+        # strip_dirs() removes the path prefix, so match bare module filenames.
+        _OWN_MODULES = (
+            "embedding.py",
+            "engine.py",
+            "retriever.py",
+            "faiss_index.py",
+            "llm.py",
+            "prompting.py",
+            "utils.py",
+            "runtime_evaluation.py",
+            "offline_evaluation.py",
+            "text_splitter.py",
+            "query_index.py",
+            "evaluate.py",
+            "build_index.py",
+            "profile_query.py",
+        )
+        own_pattern = "(" + "|".join(_OWN_MODULES) + ")"
+        fh.write("\n" + "=" * 70 + "\n")
+        fh.write("SECTION 2 — Project code only (rag/ and scripts/ functions)\n")
+        fh.write("Sorted by cumulative time. Focus here for per-query latency.\n")
+        fh.write("=" * 70 + "\n\n")
+        stats.sort_stats("cumulative").print_stats(own_pattern)
+
+        fh.write("\n" + "=" * 70 + "\n")
+        fh.write("SECTION 3 — Project code only, sorted by self time (tottime)\n")
+        fh.write("High tottime = the function body itself is slow (not its callees).\n")
+        fh.write("=" * 70 + "\n\n")
+        stats.sort_stats("tottime").print_stats(own_pattern)
 
     print(f"Saved profiling data to {profile_path}")
     print(f"Saved profiling report to {report_path}")

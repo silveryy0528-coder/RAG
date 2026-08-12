@@ -2,6 +2,20 @@
 
 This module contains functions to embed a query, run a FAISS search and
 return a list of formatted result dictionaries.
+
+Retrieval design
+----------------
+Without reranking: FAISS returns the top-k results directly; no extra work.
+
+With reranking (``use_metadata_reranking=True``):
+  1. FAISS retrieves a wider candidate pool (k * 8).
+  2. Both an intent scan and a metadata boost are applied to those candidates only.
+  3. The final top-k are selected from the reranked candidate pool.
+
+The intent scan and metadata boost are scoped to the FAISS candidate pool on
+purpose: widening that pool is the mechanism that lets hard-to-embed pages
+(title page, publications page) surface; once they surface, limiting the scan
+to those candidates is consistent and avoids scanning the entire corpus.
 """
 
 import re
@@ -122,7 +136,9 @@ def _chunk_to_result(
     section = fields["section"]
 
     metadata_boost = (
-        _metadata_boost(question, doc_id, section, text) if use_metadata_reranking else 0.0
+        _metadata_boost(question, doc_id, section, text)
+        if use_metadata_reranking
+        else 0.0
     )
     result = {
         "id": chunk_id,
@@ -193,9 +209,24 @@ def _metadata_boost(
 
 
 def _intent_match_candidates(
-    question: str, chunks: List[Dict[str, Any]]
-) -> List[tuple[int, Dict[str, Any], int]]:
-    """Find chunks that explicitly match the query intent."""
+    question: str,
+    candidates: List[tuple[int, Any]],
+) -> List[tuple[int, Any, int]]:
+    """Find candidates that explicitly match the query intent.
+
+    Parameters
+    ----------
+    question:
+        The user question.
+    candidates:
+        List of ``(chunk_index, chunk)`` pairs from the FAISS candidate pool.
+        ``chunk_index`` is the position in the original full chunk list and is
+        preserved in the output so ``seen_indices`` in the caller stays correct.
+
+    Returns
+    -------
+    List of ``(chunk_index, chunk, match_count)`` for candidates that matched.
+    """
     query_terms = _extract_query_terms(question)
     normalized_query_terms = {_normalize_token(term) for term in query_terms}
     if not normalized_query_terms:
@@ -208,8 +239,8 @@ def _intent_match_candidates(
     elif "title" in normalized_query_terms or "thesis" in normalized_query_terms:
         intent_terms = {"title", "thesis", "dissertation", "proefschrift"}
 
-    candidates: List[tuple[int, Dict[str, Any], int]] = []
-    for index, chunk in enumerate(chunks):
+    matched: List[tuple[int, Any, int]] = []
+    for chunk_index, chunk in candidates:
         fields = _chunk_fields(chunk)
         text = fields["text"] or ""
         section = fields["section"] or ""
@@ -228,9 +259,9 @@ def _intent_match_candidates(
             and (term in normalized_section_tokens or term in normalized_text_tokens)
         }
         if matched_terms:
-            candidates.append((index, chunk, len(matched_terms)))
+            matched.append((chunk_index, chunk, len(matched_terms)))
 
-    return candidates
+    return matched
 
 
 def retrieve_top_k(
@@ -239,54 +270,66 @@ def retrieve_top_k(
     embedder,
     faiss_index,
     k: int = 3,
-    candidate_multiplier: int = 3,
     use_metadata_reranking: bool = False,
 ) -> List[Dict[str, Any]]:
-    """Retrieve top-k matching chunks for a question."""
+    """Retrieve top-k matching chunks for a question.
+
+    Without reranking FAISS is asked for exactly ``k`` results and they are
+    returned in score order — no extra work.
+
+    With reranking (``use_metadata_reranking=True``) a wider candidate pool
+    (``k * 8``) is fetched so that hard-to-embed pages can surface.  The intent
+    scan and metadata boost are then applied to *those candidates only*, which
+    is consistent with the purpose of widening the pool and avoids scanning the
+    full chunk list on every query.
+    """
     query_vec = embed_text(embedder, texts=[question])
-    search_k = max(k * candidate_multiplier, k)
-    if use_metadata_reranking:
-        # Thesis-specific: widen the candidate pool for hard special-page queries.
-        search_k = max(search_k, k * 8)
+
+    search_k = k * 8 if use_metadata_reranking else k
     scores, indices = retrieve_top_k_raw(query_vec, faiss_index, search_k)
 
-    results = []
-    seen_indices = set()
-    if use_metadata_reranking:
-        intent_matches = _intent_match_candidates(question, chunks)
-        for chunk_index, chunk, boost in sorted(
-            intent_matches, key=lambda item: item[2], reverse=True
-        )[: max(k * 2, k)]:
-            result = _chunk_to_result(
-                chunk, 0.0, question, use_metadata_reranking=False
-            )
-            result["score"] += 3.0 + boost
-            if chunk_index in seen_indices:
-                continue
-            seen_indices.add(chunk_index)
-            results.append(result)
-
+    # Build the FAISS candidate pool as (chunk_index, chunk, faiss_score) triples.
+    faiss_candidates: List[tuple[int, Any, float]] = []
     for score, idx in zip(scores[0], indices[0]):
-        # Guard against invalid indices (e.g., -1)
         if idx < 0 or idx >= len(chunks):
             continue
-        chunk = chunks[idx]
-        result = _chunk_to_result(
-            chunk,
-            score,
-            question,
-            use_metadata_reranking=use_metadata_reranking,
-        )
-        if idx in seen_indices:
+        faiss_candidates.append((int(idx), chunks[idx], float(score)))
+
+    if not use_metadata_reranking:
+        return [
+            _chunk_to_result(chunk, score, question)
+            for _, chunk, score in faiss_candidates[:k]
+        ]
+
+    # --- Reranking path ---
+    # Intent scan: check only the FAISS candidates, not the full corpus.
+    intent_pool = [(idx, chunk) for idx, chunk, _ in faiss_candidates]
+    intent_matches = _intent_match_candidates(question, intent_pool)
+
+    results = []
+    seen_indices: set[int] = set()
+
+    # Insert intent-matched candidates first with a large score boost.
+    for chunk_index, chunk, boost in sorted(
+        intent_matches, key=lambda item: item[2], reverse=True
+    )[: max(k * 2, k)]:
+        if chunk_index in seen_indices:
             continue
-        seen_indices.add(idx)
+        seen_indices.add(chunk_index)
+        result = _chunk_to_result(chunk, 0.0, question, use_metadata_reranking=False)
+        result["score"] += 3.0 + boost
         results.append(result)
 
-    if use_metadata_reranking:
-        ranked_results = sorted(results, key=lambda item: item["score"], reverse=True)
-        return ranked_results[:k]
+    # Fill remaining slots from the FAISS pool with metadata boost applied.
+    for chunk_index, chunk, score in faiss_candidates:
+        if chunk_index in seen_indices:
+            continue
+        seen_indices.add(chunk_index)
+        results.append(
+            _chunk_to_result(chunk, score, question, use_metadata_reranking=True)
+        )
 
-    return results[:k]
+    return sorted(results, key=lambda item: item["score"], reverse=True)[:k]
 
 
 def retrieve_top_k_raw(query_vec, faiss_index, k: int = 3):

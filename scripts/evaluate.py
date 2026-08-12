@@ -23,7 +23,9 @@ def parse_args() -> argparse.Namespace:
     default_dataset = project_root / "data" / "evaluation" / "qa_dataset.json"
     default_processed = project_root / "data" / "processed"
 
-    parser = argparse.ArgumentParser(description="Evaluate QA performance on a dataset.")
+    parser = argparse.ArgumentParser(
+        description="Evaluate QA performance on a dataset."
+    )
     parser.add_argument(
         "--dataset",
         type=Path,
@@ -94,7 +96,13 @@ def parse_args() -> argparse.Namespace:
 def print_summary(summary: Dict[str, Any]) -> None:
     print("\n=== Evaluation summary ===\n")
     print(f"Examples: {summary.get('count')}")
-    for key in ["exact_match", "average_f1", "negative_accuracy", "retrieval_hit_rate", "average_retrieval_overlap"]:
+    for key in [
+        "exact_match",
+        "average_f1",
+        "negative_accuracy",
+        "retrieval_hit_rate",
+        "average_retrieval_overlap",
+    ]:
         value = summary.get(key)
         if value is None:
             print(f"{key}: n/a")
@@ -106,7 +114,14 @@ def print_summary(summary: Dict[str, Any]) -> None:
         print("\nBy type:")
         for example_type, metrics in by_type.items():
             print(f"  {example_type}:")
-            for metric_name in ["count", "exact_match", "average_f1", "retrieval_hit_rate", "average_retrieval_overlap", "negative_accuracy"]:
+            for metric_name in [
+                "count",
+                "exact_match",
+                "average_f1",
+                "retrieval_hit_rate",
+                "average_retrieval_overlap",
+                "negative_accuracy",
+            ]:
                 metric_value = metrics.get(metric_name)
                 if metric_value is None:
                     metric_text = "n/a"
@@ -126,7 +141,11 @@ def print_debug_examples(details: List[Dict[str, Any]], limit: int) -> None:
         details,
         key=lambda ex: (
             ex.get("f1") if ex.get("f1") is not None else 1.0,
-            ex.get("retrieval_overlap") if ex.get("retrieval_overlap") is not None else 1.0,
+            (
+                ex.get("retrieval_overlap")
+                if ex.get("retrieval_overlap") is not None
+                else 1.0
+            ),
         ),
     )
 
@@ -181,7 +200,10 @@ def main() -> None:
     if args.output_json is None:
         results_dir = default_offline_results_dir(project_root)
         results_dir.mkdir(parents=True, exist_ok=True)
-        output_path = results_dir / f"offline_evaluation-{__import__('datetime').datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}.json"
+        output_path = (
+            results_dir
+            / f"offline_evaluation-{__import__('datetime').datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}.json"
+        )
     else:
         output_path = args.output_json
         if output_path.is_dir():
@@ -189,7 +211,9 @@ def main() -> None:
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
     with output_path.open("w", encoding="utf-8") as fh:
-        json.dump({"summary": summary, "details": details}, fh, indent=2, ensure_ascii=False)
+        json.dump(
+            {"summary": summary, "details": details}, fh, indent=2, ensure_ascii=False
+        )
     print(f"\nSaved evaluation report to {output_path}")
 
 

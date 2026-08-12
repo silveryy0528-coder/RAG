@@ -1,6 +1,6 @@
 import pytest
 
-from rag.retriever import retrieve_top_k, retrieve_top_k_raw
+from rag.retriever import _intent_match_candidates, retrieve_top_k, retrieve_top_k_raw
 
 
 class FakeIndex:
@@ -39,6 +39,23 @@ def test_retrieve_top_k_WHEN_index_matches_chunks_THEN_formats_results():
     assert results[0]["score"] == pytest.approx(0.9)
     assert results[1]["id"] == "c1"
     assert results[1]["doc_id"] == "UNKNOWN"
+
+
+def test_retrieve_top_k_WHEN_no_reranking_THEN_asks_faiss_for_exactly_k():
+    """Without reranking, search_k == k so FAISS is not over-fetched."""
+    chunks = [{"id": f"c{i}", "text": f"text {i}", "page": i, "doc_id": "d0"} for i in range(10)]
+
+    requested_ks = []
+
+    class TrackingIndex:
+        def search(self, query_vec, k):
+            requested_ks.append(k)
+            return [[1.0 - i * 0.1 for i in range(k)]], [list(range(k))]
+
+    results = retrieve_top_k("query", chunks, FakeEmbedder(), TrackingIndex(), k=3)
+
+    assert requested_ks == [3], f"Expected FAISS to be called with k=3, got {requested_ks}"
+    assert len(results) == 3
 
 
 def test_retrieve_top_k_WHEN_section_label_matches_query_THEN_gives_small_boost():
@@ -165,3 +182,56 @@ def test_retrieve_top_k_raw_WHEN_called_THEN_returns_search_output():
     scores, indices = retrieve_top_k_raw(query_vec, idx, k=1)
     assert scores == [[0.1]]
     assert indices == [[2]]
+
+
+def test_intent_match_candidates_WHEN_called_with_candidate_pairs_THEN_matches_correctly():
+    candidates = [
+        (7, {"text": "Image quality assessment and image fusion for electron tomography", "metadata": {}}),
+        (12, {"text": "Chapter 1: Introduction to this thesis and dissertation", "metadata": {}}),
+        (42, {"text": "unrelated content about cooking", "metadata": {}}),
+    ]
+
+    matches = _intent_match_candidates("What is the title of the thesis", candidates)
+
+    matched_indices = [idx for idx, _, _ in matches]
+    # chunk 12 contains "thesis" and "dissertation" — should match
+    assert 12 in matched_indices
+    # chunk 7 has no title/thesis/dissertation/proefschrift terms — no match
+    assert 7 not in matched_indices
+    # chunk 42 has no matching terms
+    assert 42 not in matched_indices
+
+
+def test_retrieve_top_k_WHEN_reranking_THEN_intent_scan_limited_to_faiss_candidates():
+    """Intent scan must not touch chunks outside the FAISS candidate pool."""
+    # chunk 99 contains "thesis" but is NOT in the FAISS results.
+    # It must not appear in the output even though it would match the intent scan
+    # if all 100 chunks were scanned.
+    n = 100
+    chunks = [
+        {"id": f"c{i}", "text": "unrelated content", "page": i, "doc_id": "d0", "metadata": {}}
+        for i in range(n)
+    ]
+    chunks[99] = {
+        "id": "c99",
+        "text": "title of the thesis proefschrift",
+        "page": 99,
+        "doc_id": "d0",
+        "metadata": {},
+    }
+    # FAISS returns only indices 0..9 — chunk 99 is NOT in the candidate pool.
+    faiss_scores = [[1.0 - i * 0.01 for i in range(10)]]
+    faiss_indices = [[i for i in range(10)]]
+    idx = FakeIndex(faiss_scores, faiss_indices)
+
+    results = retrieve_top_k(
+        "What is the title of the thesis",
+        chunks,
+        FakeEmbedder(),
+        idx,
+        k=3,
+        use_metadata_reranking=True,
+    )
+
+    result_ids = [r["id"] for r in results]
+    assert "c99" not in result_ids, "Intent scan should not reach chunks outside FAISS candidates"

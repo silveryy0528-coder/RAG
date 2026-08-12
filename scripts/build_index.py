@@ -21,7 +21,6 @@ from rag.ingestion import chunk_multiple_documents
 from rag.ingestion.pipeline import IngestOptions
 from rag.text_splitter import ChunkingSentenceConfig
 
-
 DEFAULT_CHUNK_SIZE = 400
 DEFAULT_CHUNK_OVERLAP = 50
 
