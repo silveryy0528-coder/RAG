@@ -78,3 +78,14 @@ def test_parse_args_WHEN_unknown_config_key_THEN_raises(tmp_path):
 
     with pytest.raises(ValueError, match="Unknown config keys"):
         parse_args(["--config", str(config_path)])
+
+
+def test_parse_args_WHEN_integer_config_value_is_invalid_THEN_raises(tmp_path):
+    if importlib.util.find_spec("yaml") is None:
+        pytest.skip("PyYAML is not installed in this environment")
+
+    config_path = tmp_path / "evaluate.yaml"
+    config_path.write_text("debug_failures: many\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="debug_failures"):
+        parse_args(["--config", str(config_path)])

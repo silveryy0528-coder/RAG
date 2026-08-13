@@ -30,6 +30,8 @@ DEFAULT_MODEL = "gpt-4.1-mini"
 
 _BOOL_KEYS: set[str] = {"show_top_k", "evaluate", "use_metadata_reranking"}
 _PATH_KEYS: set[str] = {"processed_dir", "output_json"}
+_INT_KEYS: set[str] = {"k"}
+_NUMBER_KEYS: set[str] = {"temperature"}
 _ALLOWED_KEYS: set[str] = {
     "question",
     "processed_dir",
@@ -104,6 +106,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             allowed=_ALLOWED_KEYS,
             bool_keys=_BOOL_KEYS,
             path_keys=_PATH_KEYS,
+            int_keys=_INT_KEYS,
+            number_keys=_NUMBER_KEYS,
         )
 
     parser = argparse.ArgumentParser(

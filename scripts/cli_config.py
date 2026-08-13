@@ -33,6 +33,8 @@ def load_config(
     allowed: set[str],
     bool_keys: set[str],
     path_keys: set[str],
+    int_keys: set[str] | None = None,
+    number_keys: set[str] | None = None,
 ) -> dict[str, Any]:
     """Load and validate a YAML config file into a flat defaults dictionary.
 
@@ -47,6 +49,10 @@ def load_config(
     path_keys:
         Subset of *allowed* keys whose non-null values are coerced to
         :class:`pathlib.Path`.
+    int_keys:
+        Optional subset of *allowed* keys that must be integers.
+    number_keys:
+        Optional subset of *allowed* keys that must be integers or floats.
 
     Returns
     -------
@@ -85,14 +91,17 @@ def load_config(
     if unknown:
         raise ValueError(f"Unknown config keys in {config_path}: {', '.join(unknown)}")
 
+    int_keys = int_keys or set()
+    number_keys = number_keys or set()
+
     result: dict[str, Any] = {}
     for key, value in loaded.items():
         if key in bool_keys and not isinstance(value, bool):
             raise ValueError(f"Config key '{key}' must be a boolean (true/false).")
-        if key == "k" and not isinstance(value, int):
-            raise ValueError("Config key 'k' must be an integer.")
-        if key == "temperature" and not isinstance(value, (int, float)):
-            raise ValueError("Config key 'temperature' must be a number.")
+        if key in int_keys and not isinstance(value, int):
+            raise ValueError(f"Config key '{key}' must be an integer.")
+        if key in number_keys and not isinstance(value, (int, float)):
+            raise ValueError(f"Config key '{key}' must be a number.")
         if key in path_keys and value is not None:
             result[key] = Path(value)
             continue

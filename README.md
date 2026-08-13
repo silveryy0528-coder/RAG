@@ -79,6 +79,12 @@ CLI flags override config values when both are provided.
 python -m scripts.evaluate --dataset data/evaluation/qa_dataset.json --processed-dir data/processed
 ```
 
+### 4b. Evaluate with a YAML config
+
+```bash
+rag-evaluate --config configs/evaluate.yaml
+```
+
 ## Environment variables
 
 - `OPENAI_API_KEY`: required for LLM generation.

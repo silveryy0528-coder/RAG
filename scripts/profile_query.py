@@ -18,8 +18,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-import scripts.rag_chat as rag_chat
 import rag.engine as rag_engine
+import scripts.rag_chat as rag_chat
 
 
 def resolve_project_root() -> Path:
@@ -63,13 +63,11 @@ def _fake_generate_answer(client, prompt, model_name="gpt-4.1-mini", temperature
     return "Image quality assessment and image fusion for electron tomography"
 
 
-query_index.load_openai_client = _fake_load_openai_client
-query_index.generate_answer = _fake_generate_answer
 rag_engine.load_openai_client = _fake_load_openai_client
 rag_engine.generate_answer = _fake_generate_answer
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     project_root = resolve_project_root()
     parser = argparse.ArgumentParser(
         description="Profile a deterministic query run and save the output under results/profiling."
@@ -122,7 +120,7 @@ def parse_args() -> argparse.Namespace:
         default=True,
         help="Enable metadata-based reranking. (flag)",
     )
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def main() -> None:
@@ -178,7 +176,7 @@ def main() -> None:
             "runtime_evaluation.py",
             "offline_evaluation.py",
             "text_splitter.py",
-            "query_index.py",
+            "rag_chat.py",
             "evaluate.py",
             "build_index.py",
             "profile_query.py",

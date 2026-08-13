@@ -12,6 +12,8 @@ from scripts.cli_config import load_config
 
 _BOOL_KEYS: set[str] = {"generate", "use_metadata_reranking"}
 _PATH_KEYS: set[str] = {"dataset", "processed_dir", "output_json"}
+_INT_KEYS: set[str] = {"k", "debug_failures"}
+_NUMBER_KEYS: set[str] = {"temperature"}
 _ALLOWED_KEYS: set[str] = {
     "dataset",
     "processed_dir",
@@ -50,6 +52,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             allowed=_ALLOWED_KEYS,
             bool_keys=_BOOL_KEYS,
             path_keys=_PATH_KEYS,
+            int_keys=_INT_KEYS,
+            number_keys=_NUMBER_KEYS,
         )
 
     parser = argparse.ArgumentParser(

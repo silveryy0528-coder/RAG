@@ -29,6 +29,7 @@ applyTo: "**"
 - Follow PEP 257 and use NumPy-style docstrings.
 - Keep docstrings and comments concise.
 - Document non-obvious behavior; do not restate the code.
+- Do not expose personal or sensitive information in documentation or comments.
 
 # Working Style
 
