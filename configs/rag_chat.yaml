@@ -2,9 +2,9 @@
 # Run with:
 #   rag-chat --config configs/rag_chat.yaml
 
-question: null
+question: What publications did the PhD work result in?
 processed_dir: data/processed
-k: 3
+k: 10
 device: cuda
 model: gpt-4.1-mini
 temperature: 0.0

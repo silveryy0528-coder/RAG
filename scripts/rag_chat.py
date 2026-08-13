@@ -22,13 +22,15 @@ from pathlib import Path
 from typing import Any
 
 from rag.engine import RAGEngine
+from scripts.cli_config import load_config
 
 DEFAULT_K = 3
 DEFAULT_DEVICE = "cuda"
 DEFAULT_MODEL = "gpt-4.1-mini"
-BOOL_CONFIG_KEYS = {"show_top_k", "evaluate", "use_metadata_reranking"}
-PATH_CONFIG_KEYS = {"processed_dir", "output_json"}
-ALLOWED_CONFIG_KEYS = {
+
+_BOOL_KEYS: set[str] = {"show_top_k", "evaluate", "use_metadata_reranking"}
+_PATH_KEYS: set[str] = {"processed_dir", "output_json"}
+_ALLOWED_KEYS: set[str] = {
     "question",
     "processed_dir",
     "k",
@@ -88,61 +90,21 @@ def run(
     )
 
 
-def _load_config(config_path: Path) -> dict[str, Any]:
-    """Load and validate YAML config defaults for the CLI."""
-    if not config_path.exists():
-        raise FileNotFoundError(f"Config file not found: {config_path}")
-
-    try:
-        import yaml
-    except ImportError as exc:  # pragma: no cover
-        raise RuntimeError(
-            "YAML config support requires PyYAML. Install it with `pip install pyyaml`."
-        ) from exc
-
-    with config_path.open("r", encoding="utf-8") as fh:
-        loaded = yaml.safe_load(fh)
-
-    if loaded is None:
-        return {}
-    if not isinstance(loaded, dict):
-        raise ValueError("Config file must contain a YAML mapping at the top level.")
-
-    unknown_keys = sorted(set(loaded) - ALLOWED_CONFIG_KEYS)
-    if unknown_keys:
-        raise ValueError(
-            f"Unknown config keys in {config_path}: {', '.join(unknown_keys)}"
-        )
-
-    config: dict[str, Any] = {}
-    for key, value in loaded.items():
-        if key in BOOL_CONFIG_KEYS and not isinstance(value, bool):
-            raise ValueError(f"Config key '{key}' must be a boolean.")
-        if key == "k" and not isinstance(value, int):
-            raise ValueError("Config key 'k' must be an integer.")
-        if key == "temperature" and not isinstance(value, (int, float)):
-            raise ValueError("Config key 'temperature' must be a number.")
-        if key in PATH_CONFIG_KEYS and value is not None:
-            config[key] = Path(value)
-            continue
-        config[key] = value
-    return config
-
-
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     project_root = resolve_project_root()
     default_processed = project_root / "data" / "processed"
+
     pre_parser = argparse.ArgumentParser(add_help=False)
-    pre_parser.add_argument(
-        "--config",
-        type=Path,
-        default=None,
-        help=argparse.SUPPRESS,
-    )
+    pre_parser.add_argument("--config", type=Path, default=None)
     pre_args, _ = pre_parser.parse_known_args(argv)
     config_defaults: dict[str, Any] = {}
     if pre_args.config is not None:
-        config_defaults = _load_config(pre_args.config.expanduser())
+        config_defaults = load_config(
+            pre_args.config.expanduser(),
+            allowed=_ALLOWED_KEYS,
+            bool_keys=_BOOL_KEYS,
+            path_keys=_PATH_KEYS,
+        )
 
     parser = argparse.ArgumentParser(
         description="Interactive chat with a FAISS-backed RAG index."
@@ -165,7 +127,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         dest="question_flag",
         type=str,
         default=None,
-        help="Single-shot question to answer once and exit. Omit it to start the interactive loop. (str)",
+        help="Single-shot question to answer once and exit. Omit to start the interactive loop. (str)",
     )
     parser.add_argument(
         "--processed-dir",
@@ -201,7 +163,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--api-key",
         type=str,
         default=None,
-        help="API key for the OpenAI-like client (can also be provided via env or client default). (str)",
+        help="API key for the OpenAI-like client. (str)",
     )
     parser.add_argument(
         "--show-top-k",
@@ -217,13 +179,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--eval-model",
         type=str,
         default="gpt-3.5-turbo",
-        help="Smaller/cheaper model to use for evaluation (defaults to gpt-3.5-turbo). (str)",
+        help="Smaller/cheaper model to use for evaluation. (str)",
     )
     parser.add_argument(
         "--output-json",
         type=Path,
         default=None,
-        help="Directory or file path to save JSON results (if omitted and --evaluate is set, saves to results/query/). (Path or file)",
+        help="Directory or file path to save JSON results. (Path)",
     )
     parser.add_argument(
         "--use-metadata-reranking",
@@ -245,7 +207,7 @@ def main() -> None:
     if output_json is None and args.evaluate:
         output_json = default_query_results_dir(project_root)
 
-    print("Loading resources…")
+    print("Loading resources\u2026")
     engine = RAGEngine.from_processed_dir(args.processed_dir, device=args.device)
     print("Ready. Type 'exit' or 'quit' to stop.\n")
 

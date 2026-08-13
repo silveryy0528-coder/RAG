@@ -1,0 +1,15 @@
+# Example configuration for rag-evaluate.
+# Run with:
+#   rag-evaluate --config configs/evaluate.yaml
+
+processed_dir: data/processed
+dataset: data/evaluation/qa_dataset.json
+k: 10
+device: cuda
+generate: true
+api_key: null
+model: gpt-4.1-mini
+temperature: 0.0
+output_json: null
+debug_failures: 3
+use_metadata_reranking: true

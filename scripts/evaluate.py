@@ -8,6 +8,23 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from rag.offline_evaluation import run_offline_evaluation
+from scripts.cli_config import load_config
+
+_BOOL_KEYS: set[str] = {"generate", "use_metadata_reranking"}
+_PATH_KEYS: set[str] = {"dataset", "processed_dir", "output_json"}
+_ALLOWED_KEYS: set[str] = {
+    "dataset",
+    "processed_dir",
+    "k",
+    "device",
+    "generate",
+    "api_key",
+    "model",
+    "temperature",
+    "output_json",
+    "debug_failures",
+    "use_metadata_reranking",
+}
 
 
 def resolve_project_root() -> Path:
@@ -18,13 +35,31 @@ def default_offline_results_dir(project_root: Path) -> Path:
     return project_root / "results" / "offline_evaluation"
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     project_root = resolve_project_root()
     default_dataset = project_root / "data" / "evaluation" / "qa_dataset.json"
     default_processed = project_root / "data" / "processed"
 
+    pre_parser = argparse.ArgumentParser(add_help=False)
+    pre_parser.add_argument("--config", type=Path, default=None)
+    pre_args, _ = pre_parser.parse_known_args(argv)
+    config_defaults: dict[str, Any] = {}
+    if pre_args.config is not None:
+        config_defaults = load_config(
+            pre_args.config.expanduser(),
+            allowed=_ALLOWED_KEYS,
+            bool_keys=_BOOL_KEYS,
+            path_keys=_PATH_KEYS,
+        )
+
     parser = argparse.ArgumentParser(
         description="Evaluate QA performance on a dataset."
+    )
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=None,
+        help="Path to a YAML config file with defaults for CLI options. (Path)",
     )
     parser.add_argument(
         "--dataset",
@@ -90,7 +125,8 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Rerank the retrieved chunks using section metadata. (flag)",
     )
-    return parser.parse_args()
+    parser.set_defaults(**config_defaults)
+    return parser.parse_args(argv)
 
 
 def print_summary(summary: Dict[str, Any]) -> None:

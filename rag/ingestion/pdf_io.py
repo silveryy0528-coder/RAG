@@ -34,7 +34,7 @@ def read_pdf_file(
     excluded_sections: Optional[Iterable[str]] = None,
     document_factory: Callable[[str, dict], Any] = None,
 ) -> List[Any]:
-    """Open a PDF and return per-page document objects."""
+    """Open a PDF and return per-page document objects (text and metadata)."""
     if fitz_module is None:
         try:
             import fitz as _fitz  # type: ignore

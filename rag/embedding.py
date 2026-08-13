@@ -27,7 +27,10 @@ _configure_transformers_logging()
 
 
 def load_embedder(model_name="all-MiniLM-L6-v2", device="cuda"):
-    """Load a sentence embedder."""
+    """
+    Load a sentence embedder with internal tokenization, BPE splitting,
+    and subword handling.
+    """
     try:
         from sentence_transformers import SentenceTransformer
     except ImportError as exc:
