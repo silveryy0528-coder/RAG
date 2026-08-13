@@ -5,5 +5,5 @@ data*
 results*
 *.bak
 .vscode*
-plan*
+plan.md
 dist*
