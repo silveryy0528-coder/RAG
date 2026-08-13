@@ -1,0 +1,9 @@
+# Example configuration for rag-build.
+# Run with:
+#   rag-build --config configs/build_index.yaml
+
+raw_dir: data/raw
+processed_dir: data/processed
+device: cuda
+chunk_size: 400
+chunk_overlap: 50

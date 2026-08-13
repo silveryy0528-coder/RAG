@@ -51,6 +51,12 @@ Recommended workflow:
 python -m scripts.build_index --raw-dir data/raw --processed-dir data/processed
 ```
 
+### 1b. Build with a YAML config
+
+```bash
+rag-build --config configs/build_index.yaml
+```
+
 ### 2. Start an interactive chat loop
 
 ```bash
@@ -71,7 +77,8 @@ python -m scripts.rag_chat --question "What is the title of the thesis?" --proce
 rag-chat --config configs/rag_chat.yaml
 ```
 
-CLI flags override config values when both are provided.
+For all three CLIs, explicit command-line flags override values loaded from the
+YAML config file.
 
 ### 4. Evaluate a QA dataset
 

@@ -1,9 +1,9 @@
 """Build document chunks, embeddings and a FAISS index from raw PDF files.
 
-This script reads PDF files from the repository's ``data/raw`` directory,
-creates text chunks, embeds them using the project's embedder, normalizes the
-vectors with FAISS, builds a flat FAISS index and writes the results into
-``data/processed``.
+This CLI reads PDF files from ``data/raw`` by default, chunks them, embeds the
+chunks, normalizes the embedding vectors with FAISS, and writes the processed
+artifacts into ``data/processed``. It supports both direct CLI flags and YAML
+config files via ``--config``.
 """
 
 from __future__ import annotations
@@ -20,9 +20,19 @@ from rag.faiss_index import build_faiss_index, FaissFlatConfig
 from rag.ingestion import chunk_multiple_documents
 from rag.ingestion.pipeline import IngestOptions
 from rag.text_splitter import ChunkingSentenceConfig
+from scripts.cli_config import load_config
 
 DEFAULT_CHUNK_SIZE = 400
 DEFAULT_CHUNK_OVERLAP = 50
+_PATH_KEYS: set[str] = {"raw_dir", "processed_dir"}
+_INT_KEYS: set[str] = {"chunk_size", "chunk_overlap"}
+_ALLOWED_KEYS: set[str] = {
+    "raw_dir",
+    "processed_dir",
+    "device",
+    "chunk_size",
+    "chunk_overlap",
+}
 
 
 def resolve_project_root() -> Path:
@@ -92,13 +102,32 @@ def build_index(
     print(f"Saved FAISS index to {index_file}")
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     project_root = resolve_project_root()
     default_raw = project_root / "data" / "raw"
     default_processed = project_root / "data" / "processed"
 
+    pre_parser = argparse.ArgumentParser(add_help=False)
+    pre_parser.add_argument("--config", type=Path, default=None)
+    pre_args, _ = pre_parser.parse_known_args(argv)
+    config_defaults = {}
+    if pre_args.config is not None:
+        config_defaults = load_config(
+            pre_args.config.expanduser(),
+            allowed=_ALLOWED_KEYS,
+            bool_keys=set(),
+            path_keys=_PATH_KEYS,
+            int_keys=_INT_KEYS,
+        )
+
     parser = argparse.ArgumentParser(
         description="Build chunks, embeddings and a normalized FAISS index from raw PDFs."
+    )
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=None,
+        help="Path to a YAML config file with defaults for CLI options. (Path)",
     )
     parser.add_argument(
         "--raw-dir",
@@ -130,7 +159,8 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_CHUNK_OVERLAP,
         help="Approximate overlapping characters between chunks. (int)",
     )
-    return parser.parse_args()
+    parser.set_defaults(**config_defaults)
+    return parser.parse_args(argv)
 
 
 def main() -> None:
